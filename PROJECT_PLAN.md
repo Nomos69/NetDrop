@@ -1,10 +1,10 @@
 # NetDrop project plan
 
-Status: planning only; implementation has not started.
+Status: steps 1–8 of the implementation procedure are implemented, including live updates, reconnect resync, expiry, and cleanup. Step 9 core LAN access/sharing is confirmed by the user on a phone. Step 11 verification and documentation cover the current LAN prototype; remaining real-device observations are listed in docs/verification.md. Step 10 external alerts remain unimplemented.
 
 ## Basis and scope
 
-Source: `NetDrop_API_Updated.pptx` (11 slides). The presentation describes proposed requirements and technology choices; it is reference material, not permission to implement every proposed feature now. The current workspace contains no application source code.
+Source: `NetDrop_API_Updated.pptx` (11 slides). The presentation describes proposed requirements and technology choices; it is reference material, not permission to implement every proposed feature now. The initial workspace contained no application source code; the basic server foundation is now implemented.
 
 Goal: let people on the same LAN share temporary files, text, and links through a browser room, with live updates. Add an opt-in external alert after a successful file upload. LAN sharing must remain usable when the internet or notification provider is unavailable.
 
@@ -14,7 +14,7 @@ Working assumptions to confirm before the affected phase:
 - Files expire 30 minutes after a successful upload. Expired files cannot be downloaded, even between cleanup runs.
 - Rooms use PIN-protected access; browser sessions retain room authorization without putting PINs in URLs.
 - Start with one host process, local file storage, and in-memory room state. Restart behavior must be documented.
-- File-size limits, allowed file types, room limits, and the lifetime of shared text/links still need decisions.
+- Prototype defaults: 100 MiB uploads of any file type as download attachments; 100 rooms; 500 active items per room. Notes and links share the configured 30-minute lifetime.
 - No delivery channel, endpoint, price, quota, or delivery guarantee is assumed for Greppoo Notification Hub.
 
 ## Scope boundaries
@@ -103,4 +103,4 @@ Choose only after the core workflow passes: expiry reminders with cancellation w
 
 Phase 0 requirements → Phase 1 foundation → Phase 2 sharing → Phase 3 live updates/expiry → Phase 4 alerts → Phase 5 evaluation. Provider verification can proceed alongside LAN development. Phase 6 remains optional.
 
-Implement and verify one phase at a time. The next implementation task is Phase 1 after the initial room/access and storage assumptions are settled; this document does not start implementation.
+Implement and verify one phase at a time. The next implementation task is provider verification and external alerts. Final notification evaluation remains dependent on that implementation; current LAN verification boundaries are recorded in docs/verification.md.

@@ -1,1 +1,26 @@
-/* NetDrop interface styles will be added during implementation. */
+:root { font-family: system-ui, sans-serif; color: #182d28; background: #f3f6f2; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1050px; margin: auto; padding: 48px 24px; }
+header { margin-bottom: 28px; }
+.badge { color: #367464; font-size: .75rem; letter-spacing: .15em; font-weight: 700; }
+h1 { font-size: 3.5rem; margin: 8px 0; letter-spacing: -.06em; } h1 span { color: #438e62; }
+h2 { font-size: 1.25rem; margin: 0 0 12px; }
+p, footer { color: #51665f; line-height: 1.6; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.card { background: white; padding: 26px; border: 1px solid #d5e1d8; border-radius: 16px; }
+label { display: block; margin: 16px 0 6px; font-weight: 600; font-size: .9rem; }
+input, textarea, select { width: 100%; border: 1px solid #b9ccc0; border-radius: 8px; padding: 12px; background: #fafcf9; color: inherit; font: inherit; }
+textarea { resize: vertical; }
+button { background: #235d44; color: white; border: 1px solid #235d44; border-radius: 8px; padding: 11px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+form button { margin-top: 20px; }
+button:hover { background: #174630; } button:disabled { opacity: .55; cursor: wait; }
+.secondary { color: #235d44; background: white; } .secondary:hover { background: #eaf2e9; }
+:focus-visible { outline: 3px solid #6e9c43; outline-offset: 3px; }
+.room-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.feed { margin-top: 22px; } #status { min-height: 24px; } #status.error { color: #a22626; }
+ul { list-style: none; padding: 0; } li { border-top: 1px solid #dce5dc; padding: 18px 0; overflow-wrap: anywhere; }
+li p { white-space: pre-wrap; margin: 8px 0; } li small { display: block; color: #607168; margin-top: 8px; }
+a { color: #235d44; } footer { margin-top: 28px; font-size: .85rem; }
+[hidden] { display: none !important; }
+@media (max-width: 650px) { .grid { grid-template-columns: 1fr; } main { padding: 28px 16px; } .card { padding: 20px; } h1 { font-size: 2.8rem; } }

@@ -1,0 +1,1 @@
+PASS: join-form validation and pasted-input normalization, bidirectional file sharing/downloads, automatic file/link updates, offline reconnect with missed content, automatic expiry/deletion, expired download denial, mobile layout, and host restart recovery.

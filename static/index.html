@@ -4,13 +4,37 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NetDrop</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
 </head>
 <body>
   <main>
-    <h1>NetDrop</h1>
-    <p>Project structure ready. Application features are planned.</p>
+    <header><span class="badge">LOCAL NETWORK SHARING</span><h1>NetDrop<span>.</span></h1><p>A shared space for your files, notes, and links.</p></header>
+    <p id="status" role="status" aria-live="polite"></p>
+    <section id="lobby" class="grid">
+      <form id="create-form" class="card" novalidate>
+        <h2>Create a room</h2><p>Start a space and share its ID and PIN with your group.</p>
+        <label for="room-name">Room name</label><input id="room-name" required maxlength="60" placeholder="Study group">
+        <label for="create-pin">Choose a PIN</label><input id="create-pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" required title="Enter 6 to 12 digits (0–9)." autocomplete="new-password" placeholder="6–12 digits">
+        <button>Create room</button>
+      </form>
+      <form id="join-form" class="card" novalidate>
+        <h2>Join a room</h2><p>Use the room ID and PIN shared by its creator.</p>
+        <label for="room-id">Room ID</label><input id="room-id" required pattern="[a-fA-F0-9]{12}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="room-id-help" placeholder="Example: a1b2c3d4e5f6">
+        <p id="room-id-help">Enter the 12-character ID shown inside the host’s room, using 0–9 and a–f. This is different from the room name.</p>
+        <label for="join-pin">Room PIN (6–12 digits)</label><input id="join-pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" required title="Enter 6 to 12 digits (0–9)." autocomplete="off" placeholder="6–12 digits">
+        <button>Join room</button>
+      </form>
+    </section>
+    <section id="room" hidden>
+      <div class="room-heading"><div><h2 id="active-name"></h2><p>Room ID: <strong id="active-id"></strong></p></div><button id="leave" class="secondary">Leave room</button></div>
+      <div class="grid">
+        <form id="upload-form" class="card"><h2>Share a file</h2><label for="file">Choose a file</label><input id="file" type="file" required><p id="upload-limit"></p><button>Upload file</button></form>
+        <form id="content-form" class="card"><h2>Share text or a link</h2><label for="kind">Content type</label><select id="kind"><option value="text">Text</option><option value="link">Link</option></select><label for="content">Content</label><textarea id="content" required maxlength="10000" rows="3" placeholder="Write a note or paste a link"></textarea><button>Share</button></form>
+      </div>
+      <section class="card feed"><div class="room-heading"><h2>Shared content</h2><button id="refresh" class="secondary">Refresh</button></div><p id="live-status" role="status" aria-live="polite">Connecting to live updates…</p><ul id="items"></ul></section>
+    </section>
+    <footer>Shared items expire automatically. Rooms reset when the host restarts.</footer>
   </main>
 </body>
 </html>
