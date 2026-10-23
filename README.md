@@ -20,6 +20,25 @@ python -m app.main
 Open http://127.0.0.1:8000 on the host. Stop the server with Ctrl+C.
 On another device on the same LAN, use `http://<host-LAN-IP>:8000`. Find the host address using `hostname -I`. The host firewall must permit the configured TCP port. Phone access and file sharing were confirmed by the user; see [verification results](docs/verification.md) for the exact scope.
 
+## Online uptime monitoring
+
+The public `GET /up` endpoint returns HTTP 200 with `{"status":"ok"}` while
+the server is responding. It does not create a room or browser session.
+
+After deploying the endpoint to Render:
+
+1. Open UptimeRobot and choose **Add New Monitor**.
+2. Select **HTTP(s)** and name it **NetDrop**.
+3. Enter `https://YOUR-SERVICE.onrender.com/up` as the URL.
+4. Set the monitoring interval to **5 minutes** and select your alert contact.
+5. Create the monitor and wait for its status to show **Up**.
+
+No UptimeRobot API key or Python package is needed in NetDrop. The monitor
+runs externally, so the host computer can be off. Regular requests can help
+avoid Render Free's idle sleep, but cannot guarantee uptime or prevent restarts.
+Rooms still reset on server restart, and free-host local uploads are temporary.
+This endpoint checks HTTP responsiveness; it does not test file sharing or WebSockets.
+
 ## Configuration
 
 Defaults work without a `.env` file. To customize them, copy `.env.example` to `.env` and edit it. Restart the server after changes. Existing environment variables take precedence over `.env` values.

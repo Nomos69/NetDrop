@@ -31,6 +31,11 @@ app.include_router(realtime.router)
 app.mount("/static", StaticFiles(directory=config.STATIC_DIR), name="static")
 
 
+@app.get("/up", include_in_schema=False)
+async def health():
+    return {"status": "ok"}
+
+
 @app.get("/", include_in_schema=False)
 def index():
     return FileResponse(config.STATIC_DIR / "index.html")
