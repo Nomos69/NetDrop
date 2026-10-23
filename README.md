@@ -22,8 +22,9 @@ On another device on the same LAN, use `http://<host-LAN-IP>:8000`. Find the hos
 
 ## Online uptime monitoring
 
-The public `GET /up` endpoint returns HTTP 200 with `{"status":"ok"}` while
-the server is responding. It does not create a room or browser session.
+The public `/up` endpoint accepts GET and HEAD requests and returns HTTP 200 while
+the server is responding. GET returns `{"status":"ok"}`; HEAD returns headers
+without a response body. It does not create a room or browser session.
 
 After deploying the endpoint to Render:
 

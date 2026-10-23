@@ -31,7 +31,7 @@ app.include_router(realtime.router)
 app.mount("/static", StaticFiles(directory=config.STATIC_DIR), name="static")
 
 
-@app.get("/up", include_in_schema=False)
+@app.api_route("/up", methods=["GET", "HEAD"], include_in_schema=False)
 async def health():
     return {"status": "ok"}
 
