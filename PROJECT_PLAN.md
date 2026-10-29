@@ -113,3 +113,16 @@ and configuration/setup instructions. Each server retains independent room state
 selecting Online requires a configured, separately deployed HTTPS service.
 This implementation does not deploy a hosting service. Real cross-network
 verification remains separate from the local two-server browser checks.
+
+
+## Sharing improvements — 2026-10-29
+
+Implemented automatic idle-room cleanup, creator-owned close/remove/delete
+controls, sequential multiple-file uploads with progress/cancel/retry, live expiry
+countdowns, and private QR invitations generated on the server. Room ownership
+belongs to the creating browser session; member removal permits rejoining with the
+PIN. Existing downloads retain their deletion leases. Idle time defaults to 30
+minutes and is configurable with `NETDROP_ROOM_IDLE_SECONDS`.
+
+Greppoo notifications remain deferred. Physical-device and public cross-network
+verification still require the device checklist in `docs/verification.md`.

@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from app import config
-from app.rooms import authorize, browser_write, rooms
+from app.rooms import authorize, browser_write, rooms, owner_only
 from app.realtime import publish
 
 router = APIRouter(prefix="/api/rooms/{room_id}")
@@ -90,6 +90,7 @@ async def upload(request: Request, room=Depends(authorize)):
     size = 0
     completed = False
     pending_uploads.add(path)
+    room["_uploads"] = room.get("_uploads", 0) + 1
     try:
         with path.open("xb") as output:
             async for chunk in request.stream():
@@ -97,6 +98,7 @@ async def upload(request: Request, room=Depends(authorize)):
                 if size > config.MAX_UPLOAD_BYTES:
                     raise HTTPException(413, "File exceeds the upload limit.")
                 output.write(chunk)
+        await authorize(room["id"], request)
         check_capacity(room)
         # Lifetime begins only after the upload has been fully saved.
         saved_at = now()
@@ -109,6 +111,7 @@ async def upload(request: Request, room=Depends(authorize)):
     except OSError as error:
         raise HTTPException(507, "Unable to save the file on the host.") from error
     finally:
+        room["_uploads"] -= 1
         pending_uploads.discard(path)
         if not completed:
             path.unlink(missing_ok=True)
@@ -127,6 +130,16 @@ async def download(item_id: str, room=Depends(authorize)):
     return DownloadResponse(room, item)
 
 
+@router.delete("/items/{item_id}", dependencies=[Depends(browser_write)])
+async def delete_item(item_id: str, room=Depends(owner_only)):
+    item = room["items"].get(item_id)
+    if item is None or expired(item):
+        raise HTTPException(404, "Item not found in this room.")
+    item["expires_at"] = 0
+    cleanup_room(room)
+    return {"message": "Shared item deleted."}
+
+
 # Keep time behind one function so expiry boundaries can be tested without waiting.
 def now():
     return time.time()
@@ -143,7 +156,7 @@ def cleanup_room(room):
             continue
         if not item.get("_expiry_notified"):
             item["_expiry_notified"] = True
-            changed = True
+            changed = True  
         if item.get("_downloads", 0):
             continue
         if item["kind"] == "file":
@@ -157,9 +170,29 @@ def cleanup_room(room):
         publish(room["id"])
 
 
+def retire_room(room):
+    """Revoke access now, but let existing downloads finish before deleting files."""
+    room["closed"] = True
+    for item in room["items"].values():
+        item["expires_at"] = 0
+    from app.rooms import sessions
+    for session in sessions.values():
+        session["rooms"].discard(room["id"])
+        session["profiles"].pop(room["id"], None)
+    publish(room["id"])
+    cleanup_room(room)
+    if not room["items"] and not room.get("_uploads"):
+        rooms.pop(room["id"], None)
+
+
 def cleanup_once():
+    from app.realtime import connections
     for room in list(rooms.values()):
         cleanup_room(room)
+        transferring = room.get("_uploads") or any(item.get("_downloads") for item in room["items"].values())
+        if room.get("closed") or (not connections.get(room["id"]) and not transferring
+                                  and time.time() - room.get("last_activity", time.time()) >= config.ROOM_IDLE_SECONDS):
+            retire_room(room)
     tracked = {item["path"] for room in rooms.values() for item in room["items"].values()
                if item["kind"] == "file"} | pending_uploads
     # Room indexes reset on restart. Remove only old, generated NetDrop filenames.
@@ -204,4 +237,5 @@ class DownloadResponse(FileResponse):
             await super().__call__(scope, receive, send)
         finally:
             self.item["_downloads"] -= 1
+            self.room["last_activity"] = time.time()
             cleanup_room(self.room)

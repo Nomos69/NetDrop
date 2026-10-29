@@ -33,6 +33,8 @@ UPLOAD_DIR = BASE_DIR / "data" / "uploads"
 FILE_TTL_SECONDS = positive_integer("NETDROP_FILE_TTL_SECONDS", 1800)
 MAX_UPLOAD_BYTES = positive_integer("NETDROP_MAX_UPLOAD_MB", 100) * 1024 * 1024
 
+ROOM_IDLE_SECONDS = positive_integer("NETDROP_ROOM_IDLE_SECONDS", 1800)
+
 CLEANUP_INTERVAL_SECONDS = positive_integer("NETDROP_CLEANUP_INTERVAL_SECONDS", 5)
 
 # Each server owns its rooms. Switching mode opens the corresponding server.

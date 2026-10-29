@@ -105,3 +105,56 @@ mode browser checks passed for Local/HTTPS Online file transfer, invitations,
 manual host routing, invalid HTTP rejection for Online, settings 404, fetch failure,
 and timeout recovery. Desktop and mobile screenshots were visually inspected.
 These automated checks use isolated local servers, not separate physical networks.
+
+## Room and upload improvements — 2026-10-29
+
+Added owner-only room closure, member removal and content deletion, automatic idle
+room cleanup, sequential multi-file uploads with individual progress/cancel/retry,
+expiry countdowns, and private PIN-free QR invitation images. Owner authorization
+is checked on the backend; removing a member revokes the session's access rather
+than banning future PIN-based joins. Closing/deleting retains active-download
+leases and rejects uploads that finish after their authorization is revoked.
+
+### Physical-device follow-up checklist (pending)
+
+Use two devices and record browser/OS, network, file names, sizes, observed results,
+and screenshots. These observations must not be inferred from loopback tests.
+
+- [ ] On the LAN, scan an invitation QR with a phone. Confirm it opens the correct
+  host/room and still asks for the PIN. Use the host LAN IP, not localhost.
+- [ ] Upload several files in both directions; compare downloaded contents.
+- [ ] Observe progress on a larger file; cancel during upload and check that no
+  partial file becomes downloadable. Check the feed before retrying.
+- [ ] Disconnect/reconnect Wi-Fi; verify missed notes/links/files are restored.
+- [ ] As owner, delete content and remove the phone member; confirm the phone
+  loses access and a valid PIN permits rejoining. Close the room and confirm
+  neither device can access its previous files.
+- [ ] Observe a full normal 30-minute content lifetime and denial of its old URL.
+- [ ] Close all room tabs and wait the configured idle period plus one cleanup
+  interval; verify the room can no longer be joined. Active room tabs should
+  prevent automatic room cleanup.
+- [ ] After deploying the latest code to HTTPS hosting, repeat sharing and QR
+  joining with one device on Wi-Fi and one on mobile data. Confirm live updates,
+  reconnect and correct file contents. Local/Online servers own separate rooms.
+
+Greppoo setup and actual external notification delivery remain deferred.
+
+### Local automated results
+
+- 34 API tests passed, including owner permissions, owner leave/rejoin, room-scoped
+  removal, live revocation, idle cleanup, close-during-upload rejection, download
+  leases during deletion/closure, and private QR generation.
+- `tests/browser_controls.py` passed: multi-file uploads, individual failure/retry,
+  cancellation/retry, oversized-file rejection, countdown updates, QR rendering,
+  owner deletion/removal/closure and mobile layout. Desktop and mobile screenshots
+  were visually inspected.
+- `tests/browser_live.py` passed: existing bidirectional sharing, membership, live
+  updates, offline reconnect, expiry and restart recovery.
+- `tests/browser_modes.py` passed: Local/HTTPS Online transfers, invitations,
+  routing, settings failure/timeout recovery and mobile layout. Its upload-button
+  selector was updated for the multiple-file interface.
+- JavaScript syntax, dependency consistency and Git whitespace checks passed.
+
+All browser tests use temporary storage and loopback servers. The new results do
+not establish physical-phone QR scanning, full-duration expiry, public deployment,
+or sharing between separate physical networks. Those checks remain pending above.

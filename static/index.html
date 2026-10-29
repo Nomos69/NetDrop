@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NetDrop</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20261029b">
-  <script src="/static/app.js?v=20261029b" defer></script>
+  <link rel="stylesheet" href="/static/styles.css?v=20261029c">
+  <script src="/static/app.js?v=20261029c" defer></script>
 </head>
 <body>
   <main>
@@ -52,12 +52,13 @@
       <noscript>Enable JavaScript to connect to a room.</noscript>
     </section>
     <section id="room" hidden>
-      <div class="room-heading"><div><span id="mode-badge" class="badge"></span><h2 id="active-name"></h2><p>Room ID: <strong id="active-id"></strong></p></div><button id="leave" class="secondary">Leave room</button></div>
+      <div class="room-heading"><div><span id="mode-badge" class="badge"></span><h2 id="active-name"></h2><p>Room ID: <strong id="active-id"></strong></p></div><button id="close-room" class="danger" hidden>Close room</button><button id="leave" class="secondary">Leave room</button></div>
       <section class="card mode-card" aria-labelledby="invite-heading">
         <h2 id="invite-heading">Invite participants</h2>
         <p id="room-mode"></p>
         <label for="invite-link">Room invitation link</label><input id="invite-link" readonly>
         <button id="copy-invite" type="button" class="secondary">Copy invitation link</button>
+        <details id="qr-invite"><summary>Show invitation QR code</summary><img id="invite-qr" width="220" height="220" alt="QR code for this room invitation"><p>Scan to open the invitation, then enter the PIN. The same network requirements apply.</p></details>
         <p id="invite-help">Share the PIN separately. Opening this link still requires the room PIN.</p>
       </section>
       <section class="card members-card" aria-labelledby="members-heading">
@@ -66,7 +67,7 @@
         <ul id="members" class="members-list" aria-label="Room members"></ul>
       </section>
       <div class="grid">
-        <form id="upload-form" class="card"><h2>Share a file</h2><label for="file">Choose a file</label><input id="file" type="file" required><p id="upload-limit"></p><button>Upload file</button></form>
+        <form id="upload-form" class="card"><h2>Share files</h2><label for="file">Choose one or more files</label><input id="file" type="file" multiple required><p id="upload-limit"></p><button id="upload-submit">Upload files</button><ul id="upload-queue" aria-label="Upload queue"></ul></form>
         <form id="content-form" class="card"><h2>Share text or a link</h2><label for="kind">Content type</label><select id="kind"><option value="text">Text</option><option value="link">Link</option></select><label for="content">Content</label><textarea id="content" required maxlength="10000" rows="3" placeholder="Write a note or paste a link"></textarea><button>Share</button></form>
       </div>
       <section class="card feed"><div class="room-heading"><h2>Shared content</h2><button id="refresh" class="secondary">Refresh</button></div><p id="live-status" role="status" aria-live="polite">Connecting to live updates…</p><ul id="items"></ul></section>

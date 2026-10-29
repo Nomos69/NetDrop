@@ -82,7 +82,7 @@ with tempfile.TemporaryDirectory() as directory:
                 expect(b.locator('#live-status')).to_have_text('Live updates connected')
                 a.locator('#file').set_input_files({'name': f'{mode}.txt',
                     'mimeType': 'text/plain', 'buffer': mode.encode()})
-                a.get_by_role('button', name='Upload file', exact=True).click()
+                a.locator('#upload-submit').click()
                 expect(b.get_by_role('link', name=f'{mode}.txt', exact=True)).to_be_visible()
                 with b.expect_download() as downloaded:
                     b.get_by_role('link', name=f'{mode}.txt', exact=True).click()

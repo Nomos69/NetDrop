@@ -1,6 +1,7 @@
 """Authorized room update signals; clients fetch a fresh list after each signal."""
 
 import asyncio
+import time
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -19,7 +20,7 @@ def publish(room_id):
 
 def authorized(socket, room_id):
     session = session_for(socket)
-    return session is not None and room_id in session['rooms'] and room_id in rooms
+    return session is not None and room_id in session['rooms'] and room_id in rooms and not rooms[room_id].get('closed')
 
 
 @router.websocket('/api/rooms/{room_id}/live')
@@ -76,4 +77,6 @@ async def room_updates(socket: WebSocket, room_id: str):
         listeners.pop(socket, None)
         if not listeners:
             connections.pop(room_id, None)
+            if room_id in rooms:
+                rooms[room_id]["last_activity"] = time.time()
         publish(room_id)

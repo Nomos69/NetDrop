@@ -102,6 +102,8 @@ function showInvitation(room) {
   // A fragment keeps the room ID out of server access logs. PINs are never included.
   link.hash = `room=${room.id}`;
   $('invite-link').value = link.href;
+  $('invite-qr').src = `/api/rooms/${room.id}/invitation.svg`;
+  $('qr-invite').open = false;
   $('room-mode').textContent = room.mode === 'online'
     ? 'Online room · Internet required · Share with people on any network.'
     : 'Local room · Participants must be on the same Wi-Fi / LAN.';
@@ -216,7 +218,7 @@ function json(body) {
 
 async function perform(button, action) {
   busy = true;
-  const buttons = [...document.querySelectorAll("button")];
+  const buttons = [...document.querySelectorAll("button:not(.upload-control)")];
   buttons.forEach((control) => { control.disabled = true; });
   try { await action(); } catch (error) { status(error.message, true); }
   finally {
@@ -229,7 +231,9 @@ async function perform(button, action) {
 function showRoom(room) {
   stopLive();
   refreshNumber += 1;
+  if (activeRoom && (!room || activeRoom.id !== room.id)) clearUploads();
   activeRoom = room;
+  $('close-room').hidden = !room?.is_owner;
   $('auth-shell').hidden = Boolean(room);
   document.body.classList.toggle('in-room', Boolean(room));
   $('room').hidden = !room;
@@ -279,9 +283,27 @@ async function refresh() {
     }
     const details = document.createElement('small');
     details.textContent = `${item.kind}${item.kind === 'file' ? ` · ${item.size.toLocaleString()} bytes` : ''} · ${new Date(item.created_at).toLocaleString()} · Expires ${new Date(item.expires_at * 1000).toLocaleTimeString()}`;
-    row.append(label, details);
+    const countdown = document.createElement('small');
+    countdown.dataset.expires = item.expires_at;
+    row.append(label, details, countdown);
+    if (room.is_owner) {
+      const remove = document.createElement('button');
+      remove.className = 'secondary';
+      remove.textContent = 'Delete';
+      remove.setAttribute('aria-label', `Delete ${item.kind === 'file' ? item.name : item.kind}`);
+      remove.onclick = () => {
+        if (!confirm('Delete this shared item for everyone?')) return;
+        perform(remove, async () => {
+          await api(`/rooms/${room.id}/items/${item.id}`, {method: 'DELETE'});
+          await refresh();
+          status('Shared item deleted.');
+        });
+      };
+      row.append(remove);
+    }
     $('items').append(row);
   }
+  updateCountdowns();
 }
 
 let memberRefreshNumber = 0;
@@ -306,6 +328,21 @@ async function refreshMembers(room) {
     state.className = 'member-state';
     state.textContent = member.online ? 'Online' : 'Offline';
     row.append(dot, name, state);
+    if (room.is_owner && !member.is_you) {
+      const remove = document.createElement('button');
+      remove.className = 'secondary';
+      remove.textContent = 'Remove';
+      remove.setAttribute('aria-label', `Remove ${member.name}`);
+      remove.onclick = () => {
+        if (!confirm(`Remove ${member.name}? They can rejoin using the PIN.`)) return;
+        perform(remove, async () => {
+          await api(`/rooms/${room.id}/members/${member.id}`, {method: 'DELETE'});
+          await refreshMembers(room);
+          status('Member removed.');
+        });
+      };
+      row.append(remove);
+    }
     $('members').append(row);
   }
 }
@@ -348,19 +385,126 @@ for (const action of ['create', 'join']) {
   });
 }
 
+// Upload sequentially so a batch does not flood the host or connection.
+let uploads = [];
+let uploadRunning = false;
+function clearUploads() {
+  const previous = uploads;
+  uploads = [];
+  for (const task of previous) {
+    task.cancelled = true;
+    task.xhr?.abort();
+  }
+  $('upload-queue').replaceChildren();
+}
+function updateCountdowns() {
+  for (const label of document.querySelectorAll('[data-expires]')) {
+    const seconds = Math.max(0, Math.ceil(Number(label.dataset.expires) - Date.now() / 1000));
+    label.textContent = seconds ? `Expires in ${Math.floor(seconds / 60)}m ${seconds % 60}s` : 'Expired · awaiting cleanup';
+  }
+}
+setInterval(updateCountdowns, 1000);
+
+function drawUpload(task) {
+  task.message.textContent = `${task.file.name} · ${task.state}`;
+  task.progress.value = task.percent;
+  task.cancel.hidden = !['Queued', 'Uploading', 'Saving…'].includes(task.state);
+  task.retry.hidden = !task.retryable;
+}
+function sendUpload(task) {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    task.xhr = xhr;
+    xhr.open('POST', `/api/rooms/${task.roomId}/files`);
+    xhr.timeout = 30 * 60 * 1000;
+    xhr.setRequestHeader('X-NetDrop', '1');
+    xhr.setRequestHeader('X-Filename', encodeURIComponent(task.file.name));
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    task.state = 'Uploading';
+    drawUpload(task);
+    xhr.upload.onprogress = (event) => {
+      task.percent = event.lengthComputable ? Math.round(event.loaded / event.total * 100) : 0;
+      task.state = task.percent === 100 ? 'Saving…' : 'Uploading';
+      task.message.textContent = `${task.file.name} · ${task.percent}%${task.percent === 100 ? ' · Saving…' : ''}`;
+      task.progress.value = task.percent;
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        task.state = 'Shared'; task.percent = 100;
+      } else {
+        let detail = 'Upload failed';
+        try { detail = JSON.parse(xhr.responseText).detail || detail; } catch (error) { /* Non-JSON server error. */ }
+        task.state = typeof detail === 'string' ? detail : 'Upload failed';
+        task.retryable = true;
+      }
+      drawUpload(task); resolve();
+    };
+    const failed = (message) => { task.state = message; task.retryable = true; drawUpload(task); resolve(); };
+    xhr.onerror = () => failed('Connection failed · check the feed before retrying');
+    xhr.ontimeout = () => failed('Timed out · check the feed before retrying');
+    xhr.onabort = () => failed('Cancelled · check the feed if sending had finished');
+    xhr.send(task.file);
+  });
+}
+async function runUploads() {
+  if (uploadRunning) return;
+  uploadRunning = true;
+  try {
+    let task;
+    while ((task = uploads.find((entry) => entry.state === 'Queued'))) {
+      if (!activeRoom || task.roomId !== activeRoom.id) break;
+      await sendUpload(task);
+      task.xhr = null;
+      if (activeRoom?.id === task.roomId) {
+        try { await refresh(); } catch (error) { status(error.message, true); }
+      }
+    }
+  } finally {
+    uploadRunning = false;
+    // A room switch can enqueue a new batch while an aborted request settles.
+    if (uploads.some((task) => task.state === 'Queued')) runUploads();
+  }
+}
 $('upload-form').addEventListener('submit', (event) => {
   event.preventDefault();
-  perform(event.submitter, async () => {
-    const file = $('file').files[0];
-    if (!file) throw new Error('Choose a file first.');
-    if (file.size > maxUploadBytes) throw new Error('File exceeds the upload limit.');
-    status('Uploading file…');
-    await api(`/rooms/${activeRoom.id}/files`, {
-      method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'X-Filename': encodeURIComponent(file.name) }, body: file,
-    });
-    $('upload-form').reset();
-    await refresh();
-    status('File shared.');
+  if (!activeRoom) return;
+  for (const file of $('file').files) {
+    const row = document.createElement('li');
+    const message = document.createElement('span');
+    message.setAttribute('role', 'status');
+    const progress = document.createElement('progress');
+    progress.max = 100;
+    progress.setAttribute('aria-label', `Upload progress for ${file.name}`);
+    const cancel = document.createElement('button');
+    cancel.type = 'button'; cancel.className = 'secondary upload-control'; cancel.textContent = 'Cancel';
+    const retry = document.createElement('button');
+    retry.type = 'button'; retry.className = 'secondary upload-control'; retry.textContent = 'Retry';
+    const task = {file, roomId: activeRoom.id, message, progress, cancel, retry, percent: 0,
+      state: file.size > maxUploadBytes ? 'File exceeds the upload limit' : 'Queued'};
+    cancel.onclick = () => {
+      if (task.xhr) task.xhr.abort();
+      else { task.state = 'Cancelled'; task.retryable = true; drawUpload(task); }
+    };
+    retry.onclick = () => {
+      if (activeRoom?.id !== task.roomId) return;
+      task.state = 'Queued'; task.percent = 0; task.retryable = false;
+      drawUpload(task); runUploads();
+    };
+    row.append(message, progress, cancel, retry);
+    $('upload-queue').append(row);
+    uploads.push(task);
+    drawUpload(task);
+  }
+  $('upload-form').reset();
+  runUploads();
+});
+
+$('close-room').addEventListener('click', (event) => {
+  if (!confirm('Close this room and delete all shared content? Existing downloads may finish.')) return;
+  perform(event.currentTarget, async () => {
+    await api(`/rooms/${activeRoom.id}`, {method: 'DELETE'});
+    showRoom(null);
+    status('Room closed.');
   });
 });
 

@@ -1,0 +1,46 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Chapter 3: Technical Background</title><style>@page {size: Letter; margin:0;} *{box-sizing:border-box;} body{margin:0;font-family:Arial,sans-serif;font-size:11pt;line-height:14.5pt;color:#000;} .page{width:612pt;height:792pt;padding:72pt;break-after:page;} .page:last-child{break-after:auto;} h1{font-size:13pt;line-height:16pt;text-align:center;margin:18pt 0 12pt;font-weight:700;} h2{font-size:13pt;line-height:16pt;margin:16pt 0 14pt;font-weight:700;} h3{font-size:11pt;line-height:14.5pt;margin:0 0 15pt;font-weight:700;} p{margin:0 0 15pt;text-align:justify;} h3.first{margin-top:0;}</style></head><body>
+<section class="page">
+<h1>Chapter 3: Technical Background</h1>
+<p>NetDrop is a local-first web application designed for quick, temporary file, text, and link sharing over a Local Area Network (LAN). It also includes an online mode for connecting to a separately deployed HTTPS server. The technologies below describe what the system currently uses and what is planned for future development. Planned and optional tools are identified to distinguish them from implemented features.</p>
+<h2>3.1 Programming Languages</h2>
+<h3>Python</h3>
+<p><b>Role in System:</b> Python serves as the primary language for NetDrop’s host server. It manages room creation, PIN verification, browser sessions, file operations, and background cleanup. Its asynchronous features support live connections and scheduled tasks. Local DNS and external notification delivery are planned additions rather than current Python functions in the system.</p>
+<h2>3.2 Backend Frameworks and Servers</h2>
+<h3>FastAPI</h3>
+<p><b>Role in System:</b> FastAPI is the web framework powering NetDrop’s backend. It provides HTTP endpoints for creating and joining rooms, checking 6–12 digit PINs, sharing text and links, uploading files, and retrieving room members. File uploads use streamed binary request bodies. Pydantic models validate structured request data, and FastAPI also serves the browser interface.</p>
+<h3>Uvicorn</h3>
+<p><b>Role in System:</b> Uvicorn is the ASGI (Asynchronous Server Gateway Interface) server that runs the FastAPI application. It accepts HTTP requests and maintains WebSocket connections. NetDrop currently uses one server process because rooms, browser sessions, membership, and content indexes are stored in that process’s memory.</p>
+<h2>3.3 Frontend and Real-Time Communication</h2>
+<h3>HTML5, CSS, and Plain JavaScript</h3>
+<p><b>Role in System:</b> HTML, CSS, and JavaScript form the browser interface. They provide room forms, Local Network / Online tabs, file selection and uploads, shared notes and links, invitation links, and participant lists. JavaScript sends requests and handles live updates. Participants can use a phone, tablet, or computer browser without installing a separate NetDrop client.</p>
+</section>
+<section class="page">
+<h3 class="first">WebSockets</h3>
+<p><b>Role in System:</b> WebSockets provide real-time communication between browsers and the server. Changes to shared content or membership signal browsers to retrieve updates. Reconnection refreshes the room after an interruption. Active connections also indicate participant presence.</p>
+<h2>3.4 File Storage and Asset Retention</h2>
+<h3>Local File System and In-Memory Storage</h3>
+<p><b>Role in System:</b> NetDrop stores room metadata, sessions, and content indexes in memory, while uploaded files are saved in the host’s data/uploads folder. The default upload limit is 100 MiB, and files, text, and links expire after 30 minutes. Cleanup normally runs every five seconds. Server restarts clear room indexes; expired orphaned uploads are removed by cleanup.</p>
+<h3>SQLite</h3>
+<p><b>Role in System:</b> SQLite is an optional future database for persistent settings, notification subscriptions, activity logs, or restart-safe notification retries. It has not yet been integrated. The current system uses in-memory structures and temporary local files, so room and session information does not persist across server restarts.</p>
+<h2>3.5 Networking, DNS, and External Services</h2>
+<h3>Python dnslib</h3>
+<p><b>Role in System:</b> The dnslib library is an optional future tool for resolving a friendly local hostname to the host’s LAN IP address. This requires suitable device or network DNS settings. NetDrop currently uses the host’s address and port without a DNS server.</p>
+<h3>Greppoo Notification Hub API</h3>
+<p><b>Role in System:</b> Greppoo Notification Hub is the planned external provider for new-file alerts. Its documentation, authentication, supported channels, and recipient setup must be verified before integration. The notification module is currently a placeholder. Planned alerts will exclude file contents and room PINs, and notification failures should not interrupt local sharing.</p>
+<h3>Python HTTPX</h3>
+<p><b>Role in System:</b> HTTPX is currently a development dependency supporting FastAPI’s test client. It is also planned for outbound notification API requests with bounded timeouts and retry handling. External alert delivery is not yet implemented or verified.</p>
+</section>
+<section class="page">
+<h3 class="first">Cloudflare Tunnel (Optional Remote Access)</h3>
+<p><b>Role in System:</b> Cloudflare Tunnel is an optional future method of making a local NetDrop host reachable through a public address. It is not integrated into the current system. The existing Online tab connects to a separately deployed HTTPS server. Each server retains its own rooms and uploads; switching servers does not synchronize their content.</p>
+<h2>3.6 Development, Packaging, and Deployment</h2>
+<h3>Python Virtual Environment, pip, and python-dotenv</h3>
+<p><b>Role in System:</b> A Python virtual environment and pip requirement files manage the project’s dependencies. The python-dotenv library loads optional settings from a .env file. Configuration controls the host address, port, sharing mode, server URLs, upload size, expiry period, and cleanup interval.</p>
+<h3>unittest and Playwright</h3>
+<p><b>Role in System:</b> Python’s unittest framework and FastAPI’s test client support checks for room access, sharing, expiry, and WebSocket behavior. Playwright scripts check browser workflows, including uploads, downloads, reconnection, and local/online interaction. These are development tools rather than software that participants must install.</p>
+<h3>Render and UptimeRobot</h3>
+<p><b>Role in System:</b> The project documents Render as an online hosting target for the Python application. Online use requires a separately deployed HTTPS service with one server process. NetDrop’s /up endpoint supports external availability checks, and the README provides UptimeRobot setup guidance. The current status of hosting and monitoring is not established by this document.</p>
+<h3>PyInstaller</h3>
+<p><b>Role in System:</b> PyInstaller is an optional future packaging tool for bundling Python, backend dependencies, and static frontend files into a standalone host application. This would simplify launching NetDrop without manually setting up Python. Packages must be built and tested for each target operating system; no executable packaging workflow is currently implemented.</p>
+</section>
+</body></html>

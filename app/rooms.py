@@ -5,6 +5,8 @@ import secrets
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+import qrcode
+import qrcode.image.svg
 from pydantic import BaseModel, Field
 from app import config
 
@@ -50,8 +52,9 @@ async def authorize(room_id: str, request: Request):
     if not session or room_id not in session["rooms"]:
         raise HTTPException(403, "Join this room first.")
     room = rooms.get(room_id)
-    if room is None:
+    if room is None or room.get("closed"):
         raise HTTPException(404, "Room no longer exists.")
+    room["last_activity"] = time.time()
     return room
 
 
@@ -74,10 +77,12 @@ def grant(room_id, request, response, display_name=""):
                         secure=request.url.scheme == "https", max_age=SESSION_SECONDS)
     from app.realtime import publish
     publish(room_id)
+    return session
 
 
-def public_room(room, request):
-    return {"id": room["id"], "name": room["name"], "mode": config.sharing_mode(request)}
+def public_room(room, request, session=None):
+    return {"id": room["id"], "name": room["name"], "mode": config.sharing_mode(request),
+            "is_owner": (session or session_for(request))["member_id"] == room.get("owner_id")}
 
 
 @router.post("/rooms", status_code=201, dependencies=[Depends(browser_write)])
@@ -85,15 +90,18 @@ async def create_room(body: RoomInput, request: Request, response: Response):
     name = body.name.strip()
     if not name:
         raise HTTPException(422, "Enter a room name.")
+    from app.files import cleanup_once
+    cleanup_once()
     if len(rooms) >= 100:
-        raise HTTPException(503, "Room limit reached. Restart the host to reset rooms.")
+        raise HTTPException(503, "Room limit reached. Close an unused room or wait for idle-room cleanup.")
     room_id = secrets.token_hex(6)
     salt = secrets.token_bytes(16)
     room = {"id": room_id, "name": name, "salt": salt,
-            "pin_hash": pin_hash(body.pin, salt), "items": {}}
-    grant(room_id, request, response, body.display_name)
+            "pin_hash": pin_hash(body.pin, salt), "items": {}, "last_activity": time.time()}
+    session = grant(room_id, request, response, body.display_name)
+    room["owner_id"] = session["member_id"]
     rooms[room_id] = room
-    return public_room(room, request)
+    return public_room(room, request, session)
 
 
 @router.post("/rooms/{room_id}/join", dependencies=[Depends(browser_write)])
@@ -112,10 +120,11 @@ async def join_room(room_id: str, body: JoinInput, request: Request, response: R
         raise HTTPException(429, "Too many join attempts. Try again in a minute.", headers={"Retry-After": "60"})
     attempt["count"] += 1
     room = rooms.get(room_id)
-    if room is None or not secrets.compare_digest(pin_hash(body.pin, room["salt"]), room["pin_hash"]):
+    if room is None or room.get("closed") or not secrets.compare_digest(pin_hash(body.pin, room["salt"]), room["pin_hash"]):
         raise HTTPException(403, "Room ID or PIN is incorrect.")
-    grant(room_id, request, response, body.display_name)
-    return public_room(room, request)
+    session = grant(room_id, request, response, body.display_name)
+    room["last_activity"] = time.time()
+    return public_room(room, request, session)
 
 
 @router.get("/rooms/{room_id}")
@@ -145,3 +154,39 @@ async def leave_room(room_id: str, request: Request, room=Depends(authorize)):
     from app.realtime import publish
     publish(room_id)
     return {"message": "Left room."}
+
+
+async def owner_only(request: Request, room=Depends(authorize)):
+    if session_for(request)["member_id"] != room.get("owner_id"):
+        raise HTTPException(403, "Only the room owner can do this.")
+    return room
+
+
+@router.delete("/rooms/{room_id}", dependencies=[Depends(browser_write)])
+async def close_room(room=Depends(owner_only)):
+    from app.files import retire_room
+    retire_room(room)
+    return {"message": "Room closed."}
+
+
+@router.delete("/rooms/{room_id}/members/{member_id}", dependencies=[Depends(browser_write)])
+async def remove_member(member_id: str, room=Depends(owner_only)):
+    if member_id == room["owner_id"]:
+        raise HTTPException(409, "Use Leave room or Close room instead.")
+    for session in sessions.values():
+        if session["member_id"] == member_id and room["id"] in session["rooms"]:
+            session["rooms"].discard(room["id"])
+            session["profiles"].pop(room["id"], None)
+            from app.realtime import publish
+            publish(room["id"])
+            return {"message": "Member removed. They can rejoin with the room PIN."}
+    raise HTTPException(404, "Member not found in this room.")
+
+
+@router.get("/rooms/{room_id}/invitation.svg")
+async def invitation_qr(request: Request, room=Depends(authorize)):
+    mode = config.sharing_mode(request)
+    origin = (config.ONLINE_URL if mode == "online" else config.LOCAL_URL) or str(request.base_url).rstrip("/")
+    image = qrcode.make(origin + "/#room=" + room["id"], image_factory=qrcode.image.svg.SvgPathImage)
+    return Response(image.to_string(), media_type="image/svg+xml",
+                    headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})

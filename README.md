@@ -228,3 +228,57 @@ The current checkout's ignored `.env` points Online to
 `https://netdrop-r51l.onrender.com`. This is local configuration; changing the
 source here does not update the deployed Render service. Deploy the updated
 repository to show this screen on that public service.
+
+## Room ownership and invitations
+
+The browser session that creates a room owns it. Only that owner can close the
+room, remove another member, or delete any shared file, note, or link. These
+checks run on the server. Leaving does not close a room; rejoining from the same
+unexpired browser session restores the owner's controls. Ownership cannot be
+recovered from the PIN alone after the creator's session expires.
+
+Removing a member immediately revokes that browser session's access and live
+connection. It is not a permanent ban: someone with the PIN can rejoin. Closing a
+room revokes everyone's access and deletes its content. Already-running downloads
+may finish; their files are removed afterward. A cancelled upload might already
+have reached the server, so inspect the feed before retrying or delete the item as
+the owner.
+
+Open **Show invitation QR code** inside a room to display a locally generated QR
+code. It contains the same invitation URL as the copy button, never the PIN.
+Scanning opens the join form; the recipient still enters the PIN. Local QR codes
+require the same LAN and a reachable host address. Configure `NETDROP_LOCAL_URL`
+if the host uses localhost; a localhost QR code will not connect a phone.
+
+## Upload queue and expiry countdowns
+
+Choose multiple files, then click **Upload files**. Files upload one at a time,
+with a progress bar and a separate result for each file. **Cancel** stops a queued
+or active upload; **Retry** resubmits a cancelled or failed upload. A failed file
+does not stop later files. Oversized files are rejected individually. Progress
+reaching 100% means the browser sent the bytes; **Shared** confirms the server
+saved the file. Network failures can leave the outcome uncertain: check the feed
+before retrying to avoid duplicates.
+
+Leaving or losing room access cancels the browser's upload queue. The queue is
+kept only in the current page and is not resumed after a reload. Each shared item
+shows a countdown; it uses the device clock, while server time remains the source
+of truth for expiry. Expired entries disappear on the next cleanup update.
+
+## Idle-room cleanup
+
+`NETDROP_ROOM_IDLE_SECONDS` defaults to `1800` (30 minutes). A room is eligible
+for cleanup after that period without an authorized request, live browser
+connection, or file transfer. The idle timer restarts when the last live tab
+disconnects or a download ends. Closing a tab does not immediately close its room.
+Cleanup revokes old memberships and removes the room's content, freeing room
+capacity. Active uploads and downloads prevent automatic room retirement.
+
+Additional isolated checks:
+
+```bash
+python tests/browser_controls.py
+```
+
+This uses temporary storage and port 18768 to check owner controls, upload batches,
+progress, cancellation, retry, expiry countdowns, QR display, and mobile layout.
