@@ -12,7 +12,6 @@ from urllib.parse import unquote, urlsplit
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
-
 from app import config
 from app.rooms import authorize, browser_write, rooms
 from app.realtime import publish
@@ -25,7 +24,6 @@ pending_uploads = set()
 class ContentInput(BaseModel):
     kind: str = Field(pattern=r"^(text|link)$")
     content: str = Field(min_length=1, max_length=10000)
-
 
 def public_item(item):
     return {key: value for key, value in item.items() if key != "path" and not key.startswith("_")}

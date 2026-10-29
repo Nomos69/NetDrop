@@ -70,6 +70,15 @@ See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the full plan. Next: verify the notif
 
 ## Using rooms
 
+Enter an optional display name when creating or joining a room. Blank names get
+a generated guest name. The **Room members** list shows joined browser sessions,
+marks your own entry with **You**, and updates automatically on joins and leaves.
+Green **Online** means at least one tab for that browser has a live connection;
+multiple tabs count as one member. Disconnections can take a moment to detect.
+Closing all tabs marks the member offline; **Leave room** removes the entry.
+Expired sessions disappear as the roster refreshes. Names are self-selected,
+not verified identities, and only room members can view the list.
+
 1. Create a room with a name and a 6–12 digit PIN.
 2. Share the displayed 12-character room ID and PIN with intended participants. Use the code shown inside the room, not its name. The join form tolerates spaces and uppercase letters in copied IDs.
 3. On another browser/device, enter that ID and PIN to join.
@@ -136,3 +145,66 @@ Run it on the host, entering the administrator password locally. Adjust the subn
 ## Remaining work
 
 External notifications (step 10) require verified provider documentation, a supported delivery channel, credentials, and consenting test recipients. Notification delivery/failure/retry testing is not included in the current LAN test results. Real-phone reconnection and a full wall-clock 30-minute expiry observation are not yet confirmed; these behaviors have automated coverage using a shortened lifetime and exact deadline checks.
+
+## Local and Online sharing
+
+Use **Choose how to share** before creating or joining a room:
+
+- **Local** uses the host on the same Wi-Fi/LAN and works without internet.
+- **Online** opens the configured public HTTPS server for people on different networks.
+
+Each server owns its rooms, sessions, and uploads. Switching servers does not copy
+files or rooms. Both modes keep the room PIN, upload limits, authorization, live
+updates, and expiry. The room screen shows its mode and a copyable invitation link.
+Opening an invitation fills the room ID; the recipient must still enter the PIN.
+Clipboard access may be unavailable over LAN HTTP; select and copy the displayed
+link manually in that case.
+
+### Configure the local host
+
+Add to the local `.env`, replacing the addresses with your own:
+
+```dotenv
+NETDROP_SHARING_MODE=local
+NETDROP_LOCAL_URL=http://192.168.1.12:8000
+NETDROP_ONLINE_URL=https://YOUR-SERVICE.onrender.com
+```
+
+Run with `python -m app.main`. Keep the LAN address current if it changes.
+`NETDROP_ONLINE_URL` may be empty until you have deployed an online server; the
+interface explains that online sharing is unavailable. If the local URL is empty,
+links use the current browser address; a localhost address only works on the host.
+The mode selector routes to servers; it does not restrict the host's network
+exposure. Keep the local server accessible only within the trusted LAN.
+
+### Configure an online server
+
+Deploy this repository as a Python web service with one worker:
+
+- Build command: `pip install -r requirements.txt`
+- Start command: `uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --proxy-headers`
+- Health check path: `/up`
+- Environment: `NETDROP_SHARING_MODE=online` and
+  `NETDROP_ONLINE_URL=https://YOUR-SERVICE.onrender.com`.
+- Configure Uvicorn's `FORWARDED_ALLOW_IPS` to trust the hosting reverse proxy so
+  HTTPS and secure WebSocket requests retain their external scheme. On a service
+  whose backend is reachable exclusively through its trusted proxy, `*` can be
+  used; do not use that setting for a directly exposed backend.
+- Optionally set `NETDROP_LOCAL_URL` so participants can open your LAN host when
+  they are on that LAN. Otherwise local mode explains that no address is configured.
+
+The online server rejects non-HTTPS application requests and non-secure WebSockets;
+`/up` remains available for internal health checks. The hosting service supplies
+HTTPS. Setting the public URL alone does not deploy a server or establish public
+connectivity. Do not expose a local development server by forwarding a router port.
+
+Use a single process: rooms and content indexes still reset on restart. Uploads
+require writable disk and remain temporary; this change adds no durable database,
+object storage, or automatic replication. An online deployment must be tested on
+separate networks before claiming real-world online sharing is verified.
+
+To check both modes locally using temporary storage and a test TLS certificate:
+
+```bash
+python tests/browser_modes.py
+```

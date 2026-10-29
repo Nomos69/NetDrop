@@ -6,6 +6,55 @@ let reconnectTimer = null;
 let heartbeatTimer = null;
 let reconnectDelay = 1000;
 let refreshNumber = 0;
+let sharingConfig = null;
+
+function updateMode() {
+  const selected = $('sharing-mode').value;
+  const current = selected === sharingConfig.mode;
+  const target = sharingConfig[`${selected}_url`];
+  $('mode-badge').textContent = sharingConfig.mode === 'local' ? 'LOCAL NETWORK SHARING' : 'ONLINE SHARING';
+  $('switch-mode').hidden = current || !target;
+  $('switch-mode').textContent = `Open ${selected} server`;
+  $('mode-help').textContent = current
+    ? (selected === 'local' ? 'Local mode: connect devices to the same Wi-Fi or LAN. Internet is not required.' : 'Online mode: participants can join from different networks. Internet is required.')
+    : (target ? `Open the ${selected} server to create or join its rooms. Rooms and uploaded files stay on their original server.` : `The host has not configured a ${selected} server address. Ask the host to configure it first.`);
+  for (const id of ['create-form', 'join-form']) {
+    $(id).querySelector('button').disabled = !current;
+  }
+}
+
+$('sharing-mode').addEventListener('change', updateMode);
+$('switch-mode').addEventListener('click', () => {
+  const target = sharingConfig[`${$('sharing-mode').value}_url`];
+  if (target) location.assign(target);
+});
+
+function showInvitation(room) {
+  const base = sharingConfig[`${room.mode}_url`] || location.origin;
+  const link = new URL(base);
+  // A fragment keeps the room ID out of server access logs. PINs are never included.
+  link.hash = `room=${room.id}`;
+  $('invite-link').value = link.href;
+  $('room-mode').textContent = room.mode === 'online'
+    ? 'Online room · Internet required · Share with people on any network.'
+    : 'Local room · Participants must be on the same Wi-Fi / LAN.';
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(link.hostname);
+  $('invite-help').textContent = loopback
+    ? `This address works only on this computer. Configure ${room.mode === 'online' ? 'the public HTTPS address' : 'the host’s LAN address'} before sharing the link with another device. Share the PIN separately.`
+    : 'Share the PIN separately. Opening this link still requires the room PIN.';
+}
+
+$('copy-invite').addEventListener('click', async () => {
+  try {
+    if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+    await navigator.clipboard.writeText($('invite-link').value);
+    status('Invitation link copied. Share the PIN separately.');
+  } catch (error) {
+    $('invite-link').focus();
+    $('invite-link').select();
+    status('Select and copy the invitation link above.');
+  }
+});
 
 function stopLive() {
   clearTimeout(reconnectTimer);
@@ -30,6 +79,9 @@ function connectLive() {
     clearTimeout(heartbeatTimer);
     heartbeatTimer = setTimeout(() => socket.close(), 25000);
     const message = JSON.parse(event.data);
+    if (message.type === 'heartbeat') {
+      try { await refreshMembers(room); } catch (error) { /* Retry on the next update. */ }
+    }
     if (message.type === 'ready' || message.type === 'changed') {
       try {
         await refresh();
@@ -97,7 +149,10 @@ async function perform(button, action) {
   const buttons = [...document.querySelectorAll("button")];
   buttons.forEach((control) => { control.disabled = true; });
   try { await action(); } catch (error) { status(error.message, true); }
-  finally { buttons.forEach((control) => { control.disabled = false; }); }
+  finally {
+    buttons.forEach((control) => { control.disabled = false; });
+    if (sharingConfig) updateMode();
+  }
 }
 
 function showRoom(room) {
@@ -109,12 +164,17 @@ function showRoom(room) {
   if (room) {
     $('active-name').textContent = room.name;
     $('active-id').textContent = room.id;
+    showInvitation(room);
+    $('sharing-options').hidden = true;
     sessionStorage.setItem('netdrop-room', room.id);
     reconnectDelay = 1000;
     connectLive();
   } else {
+    $('sharing-options').hidden = false;
     sessionStorage.removeItem('netdrop-room');
     $('items').replaceChildren();
+    $('members').replaceChildren();
+    $('member-count').textContent = '';
   }
 }
 
@@ -122,7 +182,7 @@ async function refresh() {
   const room = activeRoom;
   if (!room) return;
   const number = ++refreshNumber;
-  const data = await api(`/rooms/${room.id}/items`);
+  const [data] = await Promise.all([api(`/rooms/${room.id}/items`), refreshMembers(room)]);
   if (activeRoom !== room || number !== refreshNumber) return;
   maxUploadBytes = data.max_upload_bytes;
   $('upload-limit').textContent = `Maximum file size: ${maxUploadBytes / 1024 / 1024} MiB. Shared items expire after ${data.ttl_seconds / 60} minutes.`;
@@ -151,6 +211,32 @@ async function refresh() {
   }
 }
 
+let memberRefreshNumber = 0;
+
+async function refreshMembers(room) {
+  const number = ++memberRefreshNumber;
+  const data = await api(`/rooms/${room.id}/members`);
+  if (activeRoom !== room || number !== memberRefreshNumber) return;
+  const online = data.members.filter((member) => member.online).length;
+  $('member-count').textContent = `${data.members.length} joined · ${online} online`;
+  $('members').replaceChildren();
+  for (const member of data.members) {
+    const row = document.createElement('li');
+    row.className = 'member';
+    const dot = document.createElement('span');
+    dot.className = `presence-dot${member.online ? ' online' : ''}`;
+    dot.setAttribute('aria-hidden', 'true');
+    const name = document.createElement('span');
+    name.className = 'member-name';
+    name.textContent = `${member.name}${member.is_you ? ' (You)' : ''}`;
+    const state = document.createElement('span');
+    state.className = 'member-state';
+    state.textContent = member.online ? 'Online' : 'Offline';
+    row.append(dot, name, state);
+    $('members').append(row);
+  }
+}
+
 // Normalize copied input before validation so spaces cannot block submission.
 function validateRoomForm(action) {
   const pin = $(`${action}-pin`);
@@ -171,10 +257,14 @@ for (const id of ['room-id', 'join-pin', 'create-pin']) {
 for (const action of ['create', 'join']) {
   $(`${action}-form`).addEventListener('submit', (event) => {
     event.preventDefault();
+    if (!sharingConfig || $('sharing-mode').value !== sharingConfig.mode) {
+      status('Open the selected sharing server first.', true);
+      return;
+    }
     if (!validateRoomForm(action)) return;
     perform(event.submitter, async () => {
       const path = action === 'create' ? '/rooms' : `/rooms/${$('room-id').value.trim().toLowerCase()}/join`;
-      const body = { pin: $(`${action}-pin`).value };
+      const body = { pin: $(`${action}-pin`).value, display_name: $(`${action}-display-name`).value.trim() };
       if (action === 'create') body.name = $('room-name').value.trim();
       const room = await api(path, json(body));
       $(`${action}-pin`).value = '';
@@ -220,6 +310,24 @@ $('leave').addEventListener('click', (event) => perform(event.currentTarget, asy
 }));
 
 (async () => {
+  try {
+    sharingConfig = await api('/sharing');
+    $('sharing-mode').value = sharingConfig.mode;
+    $('sharing-mode').disabled = false;
+    updateMode();
+  } catch (error) {
+    status('Unable to load sharing options. Reload the page to try again.', true);
+    return;
+  }
+  const invitation = new URLSearchParams(location.hash.slice(1)).get('room');
+  if (invitation && /^[a-f0-9]{12}$/.test(invitation)) {
+    $('room-id').value = invitation;
+    history.replaceState(null, '', location.pathname + location.search);
+    // An invitation takes priority over a previously visited room.
+    status('Invitation opened. Enter the room PIN to join.');
+    $('join-pin').focus();
+    return;
+  }
   const id = sessionStorage.getItem('netdrop-room');
   if (!id) return;
   try { showRoom(await api(`/rooms/${id}`)); await refresh(); }

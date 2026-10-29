@@ -6,6 +6,7 @@ import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
+from app import config
 
 router = APIRouter(prefix="/api")
 rooms = {}
@@ -18,10 +19,12 @@ SESSION_SECONDS = 12 * 60 * 60
 class RoomInput(BaseModel):
     name: str = Field(min_length=1, max_length=60)
     pin: str = Field(pattern=r"^[0-9]{6,12}$")
+    display_name: str = Field(default="", max_length=40)
 
 
 class JoinInput(BaseModel):
     pin: str = Field(pattern=r"^[0-9]{6,12}$")
+    display_name: str = Field(default="", max_length=40)
 
 
 async def browser_write(request: Request):
@@ -52,22 +55,29 @@ async def authorize(room_id: str, request: Request):
     return room
 
 
-def grant(room_id, request, response):
+def grant(room_id, request, response, display_name=""):
     session = session_for(request)
     token = request.cookies.get(COOKIE)
     if session is None:
         if len(sessions) >= 1000:
             raise HTTPException(503, "Too many active sessions. Try again later.")
         token = secrets.token_urlsafe(32)
-        session = {"rooms": set(), "expires": time.time() + SESSION_SECONDS}
+        session = {"rooms": set(), "expires": time.time() + SESSION_SECONDS,
+                   "member_id": secrets.token_hex(8), "profiles": {}}
         sessions[token] = session
     session["rooms"].add(room_id)
+    previous = session["profiles"].get(room_id, {})
+    session["profiles"][room_id] = {
+        "name": display_name.strip() or previous.get("name") or f'Guest {session["member_id"][:6]}'
+    }
     response.set_cookie(COOKIE, token, httponly=True, samesite="strict",
                         secure=request.url.scheme == "https", max_age=SESSION_SECONDS)
+    from app.realtime import publish
+    publish(room_id)
 
 
 def public_room(room):
-    return {"id": room["id"], "name": room["name"]}
+    return {"id": room["id"], "name": room["name"], "mode": config.SHARING_MODE}
 
 
 @router.post("/rooms", status_code=201, dependencies=[Depends(browser_write)])
@@ -81,7 +91,7 @@ async def create_room(body: RoomInput, request: Request, response: Response):
     salt = secrets.token_bytes(16)
     room = {"id": room_id, "name": name, "salt": salt,
             "pin_hash": pin_hash(body.pin, salt), "items": {}}
-    grant(room_id, request, response)
+    grant(room_id, request, response, body.display_name)
     rooms[room_id] = room
     return public_room(room)
 
@@ -104,7 +114,7 @@ async def join_room(room_id: str, body: JoinInput, request: Request, response: R
     room = rooms.get(room_id)
     if room is None or not secrets.compare_digest(pin_hash(body.pin, room["salt"]), room["pin_hash"]):
         raise HTTPException(403, "Room ID or PIN is incorrect.")
-    grant(room_id, request, response)
+    grant(room_id, request, response, body.display_name)
     return public_room(room)
 
 
@@ -113,9 +123,25 @@ async def get_room(room=Depends(authorize)):
     return public_room(room)
 
 
+@router.get("/rooms/{room_id}/members")
+async def get_members(room_id: str, request: Request, room=Depends(authorize)):
+    from app.realtime import connections
+    current = session_for(request)
+    connected = {socket.cookies.get(COOKIE) for socket in connections.get(room_id, {})}
+    members = []
+    for token, session in sessions.items():
+        if room_id in session["rooms"]:
+            members.append({"id": session["member_id"],
+                            "name": session["profiles"][room_id]["name"],
+                            "is_you": session is current, "online": token in connected})
+    return {"members": members}
+
+
 @router.post("/rooms/{room_id}/leave", dependencies=[Depends(browser_write)])
 async def leave_room(room_id: str, request: Request, room=Depends(authorize)):
-    session_for(request)["rooms"].discard(room_id)
+    session = session_for(request)
+    session["rooms"].discard(room_id)
+    session["profiles"].pop(room_id, None)
     from app.realtime import publish
     publish(room_id)
     return {"message": "Left room."}

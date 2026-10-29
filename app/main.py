@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager, suppress
 
 import uvicorn
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import config, files, realtime, rooms
@@ -25,6 +25,32 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="NetDrop", lifespan=lifespan)
+
+
+class OnlineHTTPS:
+    """Check transport without wrapping or buffering streaming uploads."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if (scope["type"] == "http" and config.SHARING_MODE == "online"
+                and scope["scheme"] != "https" and scope["path"] != "/up"):
+            response = JSONResponse({"detail": "Online sharing requires HTTPS."}, status_code=403)
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(OnlineHTTPS)
+
+
+@app.get("/api/sharing")
+async def sharing():
+    return {"mode": config.SHARING_MODE, "local_url": config.LOCAL_URL,
+            "online_url": config.ONLINE_URL}
+
+
 app.include_router(rooms.router)
 app.include_router(files.router)
 app.include_router(realtime.router)

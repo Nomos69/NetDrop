@@ -58,3 +58,24 @@ The address may change when the host reconnects to Wi-Fi. Use the current Wi-Fi 
 Physical-phone reconnect, transfers explicitly confirmed in both directions, notes/links, and a full wall-clock 30-minute expiry observation remain optional follow-up evidence for the LAN prototype. Do not describe those as completed physical-device tests.
 
 External notification delivery, provider failure handling, retries, and user-notice-time evaluation remain untested because step 10 is not implemented. The current results do not establish production readiness, internet-exposed security, performance under load, or support on other operating systems.
+
+## Local / Online mode verification — 2026-10-29
+
+- API suite: 26 tests passed, including mode discovery, secure online session
+  cookies, PIN-authorized online upload/download, WSS updates, rejection of
+  plaintext online requests, and server URL validation.
+- `tests/browser_modes.py`: passed against two independent loopback servers,
+  using HTTP for Local and a temporary self-signed TLS certificate for Online.
+  Verified invitation prefill without automatic authorization, PIN-free links,
+  clipboard fallback, uploaded/downloaded file bytes in both modes, live updates,
+  navigation between configured servers, missing-server explanation, disabled
+  submission in an unavailable mode, and mobile layout without horizontal overflow.
+- Existing `tests/browser_live.py`: passed, including bidirectional file transfers,
+  membership, live updates, reconnect/resync, expiry, and restart recovery.
+- Desktop lobby and mobile room screenshots were visually inspected. JavaScript
+  syntax and Git whitespace checks passed.
+
+Browser tests use temporary storage and ports 18765–18767. They do not deploy or
+contact a public NetDrop service. No new physical-device or public cross-network
+result is claimed. The online instance still needs public HTTPS hosting and a
+separate Wi-Fi/mobile-data verification. Rooms and indexes remain in memory.

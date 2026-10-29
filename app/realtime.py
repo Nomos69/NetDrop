@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.rooms import rooms, session_for
+from app import config
 
 router = APIRouter()
 connections = {}
@@ -25,7 +26,8 @@ def authorized(socket, room_id):
 async def room_updates(socket: WebSocket, room_id: str):
     origin = urlsplit(socket.headers.get('origin', ''))
     expected_scheme = 'https' if socket.url.scheme == 'wss' else 'http'
-    if (origin.scheme != expected_scheme or origin.netloc != socket.headers.get('host')
+    if ((config.SHARING_MODE == 'online' and socket.url.scheme != 'wss')
+            or origin.scheme != expected_scheme or origin.netloc != socket.headers.get('host')
             or not authorized(socket, room_id)):
         await socket.close(code=1008)
         return
@@ -36,6 +38,9 @@ async def room_updates(socket: WebSocket, room_id: str):
     await socket.accept()
     changed = asyncio.Event()
     listeners[socket] = changed
+    for other, event in list(listeners.items()):
+        if other is not socket:
+            event.set()
     receiver = asyncio.create_task(socket.receive())
     waiter = None
     try:
@@ -71,3 +76,4 @@ async def room_updates(socket: WebSocket, room_id: str):
         listeners.pop(socket, None)
         if not listeners:
             connections.pop(room_id, None)
+        publish(room_id)
