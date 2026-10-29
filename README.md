@@ -148,7 +148,7 @@ External notifications (step 10) require verified provider documentation, a supp
 
 ## Local and Online sharing
 
-Use **Choose how to share** before creating or joining a room:
+Use the **Local Network / Online** tabs before creating or joining a room:
 
 - **Local** uses the host on the same Wi-Fi/LAN and works without internet.
 - **Online** opens the configured public HTTPS server for people on different networks.
@@ -171,10 +171,11 @@ NETDROP_ONLINE_URL=https://YOUR-SERVICE.onrender.com
 ```
 
 Run with `python -m app.main`. Keep the LAN address current if it changes.
-`NETDROP_ONLINE_URL` may be empty until you have deployed an online server; the
-interface explains that online sharing is unavailable. If the local URL is empty,
+`NETDROP_ONLINE_URL` pre-fills the Online connection field. If it is empty,
+participants can paste a complete HTTPS server address or invitation link.
+Click **Connect to online server**, then enter the room PIN on that server. If the local URL is empty,
 links use the current browser address; a localhost address only works on the host.
-The mode selector routes to servers; it does not restrict the host's network
+The mode tabs route to servers; it does not restrict the host's network
 exposure. Keep the local server accessible only within the trusted LAN.
 
 ### Configure an online server
@@ -191,7 +192,7 @@ Deploy this repository as a Python web service with one worker:
   whose backend is reachable exclusively through its trusted proxy, `*` can be
   used; do not use that setting for a directly exposed backend.
 - Optionally set `NETDROP_LOCAL_URL` so participants can open your LAN host when
-  they are on that LAN. Otherwise local mode explains that no address is configured.
+  they are on that LAN. Otherwise participants can enter a local host address manually.
 
 The online server rejects non-HTTPS application requests and non-secure WebSockets;
 `/up` remains available for internal health checks. The hosting service supplies
@@ -208,3 +209,22 @@ To check both modes locally using temporary storage and a test TLS certificate:
 ```bash
 python tests/browser_modes.py
 ```
+
+### Connection screen troubleshooting
+
+The compact connection card uses Local Network / Online tabs and Join / Create
+room actions. PINs remain 6–12 digits and room IDs remain 12 characters. The UI
+uses versioned assets, and the homepage is served without caching to avoid mixing
+old scripts with a new screen. Settings requests time out after ten seconds; a
+failed or missing `/api/sharing` endpoint leaves the tabs and invite-link field
+usable, with a visible retry action. Restart an older server after updating code.
+
+Public HTTPS hosts automatically identify as Online and use their current origin
+when no online URL was configured. Local/private hosts retain Local mode unless
+explicitly configured otherwise. Behind a reverse proxy, preserve the HTTPS scheme
+using the trusted proxy configuration described above.
+
+The current checkout's ignored `.env` points Online to
+`https://netdrop-r51l.onrender.com`. This is local configuration; changing the
+source here does not update the deployed Render service. Deploy the updated
+repository to show this screen on that public service.

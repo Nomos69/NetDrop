@@ -76,8 +76,8 @@ def grant(room_id, request, response, display_name=""):
     publish(room_id)
 
 
-def public_room(room):
-    return {"id": room["id"], "name": room["name"], "mode": config.SHARING_MODE}
+def public_room(room, request):
+    return {"id": room["id"], "name": room["name"], "mode": config.sharing_mode(request)}
 
 
 @router.post("/rooms", status_code=201, dependencies=[Depends(browser_write)])
@@ -93,7 +93,7 @@ async def create_room(body: RoomInput, request: Request, response: Response):
             "pin_hash": pin_hash(body.pin, salt), "items": {}}
     grant(room_id, request, response, body.display_name)
     rooms[room_id] = room
-    return public_room(room)
+    return public_room(room, request)
 
 
 @router.post("/rooms/{room_id}/join", dependencies=[Depends(browser_write)])
@@ -115,12 +115,12 @@ async def join_room(room_id: str, body: JoinInput, request: Request, response: R
     if room is None or not secrets.compare_digest(pin_hash(body.pin, room["salt"]), room["pin_hash"]):
         raise HTTPException(403, "Room ID or PIN is incorrect.")
     grant(room_id, request, response, body.display_name)
-    return public_room(room)
+    return public_room(room, request)
 
 
 @router.get("/rooms/{room_id}")
-async def get_room(room=Depends(authorize)):
-    return public_room(room)
+async def get_room(request: Request, room=Depends(authorize)):
+    return public_room(room, request)
 
 
 @router.get("/rooms/{room_id}/members")

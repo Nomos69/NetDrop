@@ -61,9 +61,9 @@ with tempfile.TemporaryDirectory() as directory:
             b.on('pageerror', lambda error: errors.append(str(error)))
             for mode, origin in [('local', local), ('online', online)]:
                 a.goto(origin)
-                expect(a.locator('#sharing-mode')).to_be_enabled()
-                expect(a.locator('#sharing-mode')).to_have_value(mode)
+                expect(a.locator(f'#mode-{mode}')).to_have_attribute('aria-pressed', 'true')
                 a.screenshot(path=f'/tmp/netdrop-{mode}-lobby.png', full_page=True)
+                a.locator('#action-create').click()
                 a.locator('#room-name').fill(f'{mode} room')
                 a.locator('#create-pin').fill('123456')
                 a.get_by_role('button', name='Create room', exact=True).click()
@@ -93,23 +93,63 @@ with tempfile.TemporaryDirectory() as directory:
                 a.get_by_role('button', name='Leave room', exact=True).click()
                 b.get_by_role('button', name='Leave room', exact=True).click()
                 target_mode, target = ('online', online) if mode == 'local' else ('local', local)
-                a.locator('#sharing-mode').select_option(target_mode)
-                expect(a.get_by_role('button', name='Create room', exact=True)).to_be_disabled()
+                a.locator(f'#mode-{target_mode}').click()
+                expect(a.locator('#lobby')).to_be_hidden()
+                expect(a.locator('#server-link')).to_have_value(target)
                 a.locator('#switch-mode').click()
                 expect(a).to_have_url(target + '/')
-                expect(a.locator('#sharing-mode')).to_have_value(target_mode)
-            # Missing online configuration must explain the limitation, never create a local room.
+                expect(a.locator(f'#mode-{target_mode}')).to_have_attribute('aria-pressed', 'true')
+            # Missing configuration still offers a usable HTTPS invite input.
             a.route('**/api/sharing', lambda route: route.fulfill(json={
                 'mode': 'local', 'local_url': local, 'online_url': ''}))
             a.goto(local)
-            expect(a.locator('#sharing-mode')).to_be_enabled()
-            a.locator('#sharing-mode').select_option('online')
-            expect(a.locator('#mode-help')).to_contain_text('has not configured')
-            expect(a.locator('#switch-mode')).to_be_hidden()
-            expect(a.get_by_role('button', name='Create room', exact=True)).to_be_disabled()
+            a.locator('#mode-online').click()
+            expect(a.locator('#server-form')).to_be_visible()
+            a.locator('#server-link').fill('http://unsafe.example')
+            a.locator('#switch-mode').click()
+            assert 'HTTPS' in a.locator('#server-link').evaluate('(el) => el.validationMessage')
+            a.locator('#server-link').fill(online)
+            a.locator('#switch-mode').click()
+            expect(a).to_have_url(online + '/')
+            a.unroute('**/api/sharing')
+            # An old backend or a failed request must never lock the mode buttons.
+            a.add_init_script("""
+                if (location.search === '?settings-timeout') {
+                    const originalFetch = window.fetch;
+                    window.fetch = (input, options) => String(input) === '/api/sharing'
+                        ? new Promise((resolve, reject) => options.signal.addEventListener('abort',
+                            () => reject(new DOMException('Timed out', 'TimeoutError')), {once: true}))
+                        : originalFetch(input, options);
+                }
+            """)
+            for failure in ['404', 'offline', 'timeout']:
+                def fail_settings(route):
+                    if failure == '404':
+                        route.fulfill(status=404, json={'detail': 'Not Found'})
+                    elif failure == 'offline':
+                        route.abort('failed')
+                if failure != 'timeout':
+                    a.route('**/api/sharing', fail_settings)
+                a.goto(local + ('/?settings-timeout' if failure == 'timeout' else ''), wait_until='domcontentloaded')
+                expect(a.locator('#mode-online')).to_be_enabled()
+                a.locator('#mode-online').click()
+                expect(a.locator('#server-form')).to_be_visible()
+                expect(a.locator('#retry-settings')).to_be_visible(timeout=15000)
+                expect(a.locator('#mode-online')).to_have_attribute('aria-pressed', 'true')
+                if failure != 'timeout':
+                    a.unroute('**/api/sharing')
+            a.goto(local)
+            a.locator('#mode-online').click()
+            a.screenshot(path='/tmp/netdrop-online-connect-desktop.png', full_page=True)
+            b.goto(local)
+            b.locator('#mode-online').click()
+            b.screenshot(path='/tmp/netdrop-online-connect-mobile.png', full_page=True)
+            assert b.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            a.unroute_all(behavior='wait')
+            b.unroute_all(behavior='wait')
             assert not errors, errors
             browser.close()
-        print('PASS: Local/HTTPS Online transfers, invitations, live updates, mode routing, unavailable mode, and mobile layout. Public cross-network access not tested.')
+        print('PASS: Local/HTTPS Online transfers, invitations, live updates, mode routing, manual invite routing, settings failure/timeout recovery, and mobile layout. Public cross-network access not tested.')
     finally:
         for process in processes:
             process.terminate()

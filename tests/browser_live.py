@@ -29,6 +29,7 @@ with tempfile.TemporaryDirectory() as storage:
             a.on('pageerror', lambda error: errors.append(str(error)))
             b.on('pageerror', lambda error: errors.append(str(error)))
             a.goto('http://127.0.0.1:18765/')
+            a.locator('#action-create').click()
             a.locator('#create-display-name').fill('Rhimar')
             a.locator('#room-name').fill('Live test')
             a.locator('#create-pin').fill('123456')

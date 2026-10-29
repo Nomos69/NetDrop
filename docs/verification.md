@@ -79,3 +79,29 @@ Browser tests use temporary storage and ports 18765–18767. They do not deploy 
 contact a public NetDrop service. No new physical-device or public cross-network
 result is claimed. The online instance still needs public HTTPS hosting and a
 separate Wi-Fi/mobile-data verification. Rooms and indexes remain in memory.
+
+## Connection screen repair — 2026-10-29
+
+Replaced the settings-dependent dropdown with always-available Local Network /
+Online buttons and a compact monochrome connection card based on the supplied
+reference. Join/Create actions preserve existing room creation, membership, and
+6–12 digit PIN behavior. Online accepts an HTTPS host address or invitation link;
+Local accepts a LAN host address. Neither forwards a PIN in a URL.
+
+The previous implementation disabled the selector until `/api/sharing` completed
+and had no request timeout. Settings now time out after ten seconds and failure
+leaves mode navigation usable, with a retry button. Versioned assets and a no-store
+homepage reduce stale HTML/script combinations. The exact cause of the user's
+original loading screenshot was not independently reproduced on their browser.
+
+A live read of `https://netdrop-r51l.onrender.com/api/sharing` returned HTTP 200
+with Local mode and empty local/online addresses before these changes. The ignored
+local `.env` now pre-fills that known online address. No public deployment was
+performed. Public HTTPS deployments of this updated code detect Online mode and
+infer their public origin when optional URL configuration is absent.
+
+Verification: 27 API tests passed; existing live-sharing browser checks passed;
+mode browser checks passed for Local/HTTPS Online file transfer, invitations,
+manual host routing, invalid HTTP rejection for Online, settings 404, fetch failure,
+and timeout recovery. Desktop and mobile screenshots were visually inspected.
+These automated checks use isolated local servers, not separate physical networks.

@@ -4,7 +4,7 @@ import asyncio
 from contextlib import asynccontextmanager, suppress
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -46,9 +46,10 @@ app.add_middleware(OnlineHTTPS)
 
 
 @app.get("/api/sharing")
-async def sharing():
-    return {"mode": config.SHARING_MODE, "local_url": config.LOCAL_URL,
-            "online_url": config.ONLINE_URL}
+async def sharing(request: Request):
+    mode = config.sharing_mode(request)
+    return {"mode": mode, "local_url": config.LOCAL_URL,
+            "online_url": config.ONLINE_URL or (str(request.base_url).rstrip("/") if mode == "online" else "")}
 
 
 app.include_router(rooms.router)
@@ -64,7 +65,7 @@ async def health():
 
 @app.get("/", include_in_schema=False)
 def index():
-    return FileResponse(config.STATIC_DIR / "index.html")
+    return FileResponse(config.STATIC_DIR / "index.html", headers={"Cache-Control": "no-store"})
 
 
 if __name__ == "__main__":

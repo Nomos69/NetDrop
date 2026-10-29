@@ -6,28 +6,95 @@ let reconnectTimer = null;
 let heartbeatTimer = null;
 let reconnectDelay = 1000;
 let refreshNumber = 0;
-let sharingConfig = null;
+// Keep navigation available even if an older server lacks /api/sharing.
+function browserMode() {
+  const host = location.hostname;
+  const privateHost = host === 'localhost' || host.endsWith('.local') || host.endsWith('.lan')
+    || host.endsWith('.localhost') || host === '[::1]'
+    || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(host);
+  return location.protocol === 'https:' && !privateHost ? 'online' : 'local';
+}
+let sharingConfig = { mode: browserMode(), local_url: '', online_url: '' };
+let selectedMode = sharingConfig.mode;
+let modeChosen = false;
+let settingsFailed = false;
+let busy = false;
 
-function updateMode() {
-  const selected = $('sharing-mode').value;
-  const current = selected === sharingConfig.mode;
-  const target = sharingConfig[`${selected}_url`];
-  $('mode-badge').textContent = sharingConfig.mode === 'local' ? 'LOCAL NETWORK SHARING' : 'ONLINE SHARING';
-  $('switch-mode').hidden = current || !target;
-  $('switch-mode').textContent = `Open ${selected} server`;
-  $('mode-help').textContent = current
-    ? (selected === 'local' ? 'Local mode: connect devices to the same Wi-Fi or LAN. Internet is not required.' : 'Online mode: participants can join from different networks. Internet is required.')
-    : (target ? `Open the ${selected} server to create or join its rooms. Rooms and uploaded files stay on their original server.` : `The host has not configured a ${selected} server address. Ask the host to configure it first.`);
-  for (const id of ['create-form', 'join-form']) {
-    $(id).querySelector('button').disabled = !current;
+function setRoomAction(action) {
+  for (const choice of ['join', 'create']) {
+    $(`${choice}-form`).hidden = choice !== action;
+    $(`action-${choice}`).setAttribute('aria-pressed', String(choice === action));
   }
 }
+for (const action of ['join', 'create']) {
+  $(`action-${action}`).addEventListener('click', () => setRoomAction(action));
+}
 
-$('sharing-mode').addEventListener('change', updateMode);
-$('switch-mode').addEventListener('click', () => {
-  const target = sharingConfig[`${$('sharing-mode').value}_url`];
-  if (target) location.assign(target);
+function updateMode() {
+  const current = selectedMode === sharingConfig.mode;
+  for (const mode of ['local', 'online']) {
+    $(`mode-${mode}`).setAttribute('aria-pressed', String(selectedMode === mode));
+    $(`mode-${mode}`).disabled = busy;
+  }
+  $('mode-badge').textContent = sharingConfig.mode === 'local' ? 'LOCAL NETWORK' : 'ONLINE';
+  $('server-form').hidden = current;
+  $('lobby').hidden = Boolean(activeRoom) || !current;
+  $('retry-settings').hidden = !settingsFailed;
+  $('mode-help').textContent = current
+    ? (selectedMode === 'local' ? 'Share on the same Wi-Fi or LAN. No internet needed.' : 'Share across different networks through this HTTPS server.')
+    : (selectedMode === 'online' ? 'Connect to an online host using its HTTPS address or invitation link.' : 'Connect to the host’s local address while on the same Wi-Fi or LAN.');
+  $('server-label').textContent = selectedMode === 'online' ? 'Or paste invite link' : 'Local host or invite link';
+  $('server-help').textContent = selectedMode === 'online'
+    ? 'Paste the host’s HTTPS server address or room invitation link. Internet required.'
+    : 'Use the host’s LAN address, for example http://192.168.1.12:8000.';
+  $('switch-mode').textContent = `Connect to ${selectedMode === 'online' ? 'online' : 'local'} server`;
+  $('connection-caption').textContent = selectedMode === 'online' ? 'CONNECT VIA AN HTTPS HOST' : 'DEVICES MUST BE ON THE SAME NETWORK';
+}
+
+for (const mode of ['local', 'online']) {
+  $(`mode-${mode}`).addEventListener('click', () => {
+    modeChosen = true;
+    selectedMode = mode;
+    $('server-link').value = sharingConfig[`${mode}_url`] || '';
+    $('server-link').setCustomValidity('');
+    updateMode();
+  });
+}
+$('server-link').addEventListener('input', () => $('server-link').setCustomValidity(''));
+$('server-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const input = $('server-link');
+  try {
+    const target = new URL(input.value.trim());
+    if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password
+        || target.pathname !== '/' || target.search || (selectedMode === 'online' && target.protocol !== 'https:')) {
+      throw new Error('Invalid server link');
+    }
+    location.assign(target.href);
+  } catch (error) {
+    input.setCustomValidity(selectedMode === 'online'
+      ? 'Enter a complete HTTPS server address or invitation link, such as https://your-host.example/#room=…'
+      : 'Enter a complete local host address, such as http://192.168.1.12:8000.');
+    input.reportValidity();
+  }
 });
+
+async function loadSharingSettings() {
+  try {
+    const data = await api('/sharing');
+    if (!['local', 'online'].includes(data.mode)) throw new Error('Invalid settings');
+    sharingConfig = data;
+    if (!modeChosen) selectedMode = data.mode;
+    if (!$('server-link').value) $('server-link').value = data[`${selectedMode}_url`] || '';
+    settingsFailed = false;
+    status('');
+  } catch (error) {
+    settingsFailed = true;
+    status('Connection settings are unavailable. You can still choose a mode and paste the host’s invite link. Restart or update the server, then retry.', true);
+  }
+  updateMode();
+}
+$('retry-settings').addEventListener('click', loadSharingSettings);
 
 function showInvitation(room) {
   const base = sharingConfig[`${room.mode}_url`] || location.origin;
@@ -129,6 +196,8 @@ function status(message, error = false) {
 
 async function api(path, options = {}) {
   const response = await fetch(`/api${path}`, {
+    signal: AbortSignal.timeout(10000),
+    cache: 'no-store',
     ...options,
     headers: { 'X-NetDrop': '1', ...options.headers },
   });
@@ -146,12 +215,14 @@ function json(body) {
 }
 
 async function perform(button, action) {
+  busy = true;
   const buttons = [...document.querySelectorAll("button")];
   buttons.forEach((control) => { control.disabled = true; });
   try { await action(); } catch (error) { status(error.message, true); }
   finally {
     buttons.forEach((control) => { control.disabled = false; });
-    if (sharingConfig) updateMode();
+    busy = false;
+    updateMode();
   }
 }
 
@@ -159,7 +230,8 @@ function showRoom(room) {
   stopLive();
   refreshNumber += 1;
   activeRoom = room;
-  $('lobby').hidden = Boolean(room);
+  $('auth-shell').hidden = Boolean(room);
+  document.body.classList.toggle('in-room', Boolean(room));
   $('room').hidden = !room;
   if (room) {
     $('active-name').textContent = room.name;
@@ -175,6 +247,7 @@ function showRoom(room) {
     $('items').replaceChildren();
     $('members').replaceChildren();
     $('member-count').textContent = '';
+    updateMode();
   }
 }
 
@@ -257,7 +330,7 @@ for (const id of ['room-id', 'join-pin', 'create-pin']) {
 for (const action of ['create', 'join']) {
   $(`${action}-form`).addEventListener('submit', (event) => {
     event.preventDefault();
-    if (!sharingConfig || $('sharing-mode').value !== sharingConfig.mode) {
+    if (selectedMode !== sharingConfig.mode) {
       status('Open the selected sharing server first.', true);
       return;
     }
@@ -309,18 +382,12 @@ $('leave').addEventListener('click', (event) => perform(event.currentTarget, asy
   showRoom(null); status('Left room.');
 }));
 
+updateMode();
 (async () => {
-  try {
-    sharingConfig = await api('/sharing');
-    $('sharing-mode').value = sharingConfig.mode;
-    $('sharing-mode').disabled = false;
-    updateMode();
-  } catch (error) {
-    status('Unable to load sharing options. Reload the page to try again.', true);
-    return;
-  }
+  await loadSharingSettings();
   const invitation = new URLSearchParams(location.hash.slice(1)).get('room');
   if (invitation && /^[a-f0-9]{12}$/.test(invitation)) {
+    setRoomAction('join');
     $('room-id').value = invitation;
     history.replaceState(null, '', location.pathname + location.search);
     // An invitation takes priority over a previously visited room.

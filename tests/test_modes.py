@@ -50,6 +50,21 @@ class ModeTests(unittest.TestCase):
                                           headers={'origin': 'https://example.com'}) as socket:
                 self.assertEqual(socket.receive_json()['type'], 'ready')
 
+    def test_public_https_detected_without_online_configuration(self):
+        with patch.object(config, 'SHARING_MODE', 'local'), \
+                patch.object(config, 'ONLINE_URL', ''), \
+                TestClient(app, base_url='https://netdrop.example.com') as client:
+            data = client.get('/api/sharing').json()
+            self.assertEqual(data['mode'], 'online')
+            self.assertEqual(data['online_url'], 'https://netdrop.example.com')
+            room = client.post('/api/rooms', headers=self.headers,
+                               json={'name': 'Hosted', 'pin': '123456'}).json()
+            self.assertEqual(room['mode'], 'online')
+            self.assertEqual(client.get(f'/api/rooms/{room["id"]}').json()['mode'], 'online')
+        for origin in ['http://192.168.1.2:8000', 'https://127.0.0.1:8000', 'https://host.local']:
+            with patch.object(config, 'SHARING_MODE', 'local'), TestClient(app, base_url=origin) as client:
+                self.assertEqual(client.get('/api/sharing').json()['mode'], 'local')
+
     def test_online_rejects_plaintext_requests_and_websockets(self):
         with patch.object(config, 'SHARING_MODE', 'online'), TestClient(app) as client:
             for path in ['/', '/api/sharing', '/api/rooms/example/items']:

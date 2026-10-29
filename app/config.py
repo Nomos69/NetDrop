@@ -1,6 +1,7 @@
 """Settings loaded from the project .env file or environment variables."""
 
 import os
+import ipaddress
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -61,3 +62,13 @@ LOCAL_URL = server_url("NETDROP_LOCAL_URL")
 ONLINE_URL = server_url("NETDROP_ONLINE_URL", online=True)
 if SHARING_MODE == "online" and not ONLINE_URL:
     raise ValueError("Online mode requires NETDROP_ONLINE_URL with the public HTTPS address")
+
+
+def sharing_mode(request):
+    """Public HTTPS deployments work even before optional addresses are set."""
+    hostname = request.url.hostname or ""
+    try:
+        public_host = ipaddress.ip_address(hostname).is_global
+    except ValueError:
+        public_host = hostname != "localhost" and "." in hostname and not hostname.endswith((".local", ".lan", ".localhost"))
+    return "online" if request.url.scheme == "https" and public_host else SHARING_MODE
