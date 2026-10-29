@@ -360,6 +360,41 @@ function validateRoomForm(action) {
   return $(`${action}-form`).reportValidity();
 }
 
+// Render masked dots in actual grid cells; native password text can scroll
+// independently without shifting the visible dots. The input keeps its label,
+// validation, paste, autofill and keyboard editing behavior.
+function renderPin(input) {
+  const cells = input.nextElementSibling;
+  const count = Math.max(6, input.value.length);
+  cells.style.setProperty('--pin-slots', count);
+  cells.replaceChildren();
+  for (let index = 0; index < count; index += 1) {
+    const cell = document.createElement('span');
+    const filled = index < input.value.length;
+    cell.className = `pin-cell${filled ? ' filled' : ''}${index === Math.min(input.selectionStart ?? 0, count - 1) ? ' active' : ''}`;
+    cell.textContent = filled || !input.value ? '•' : '';
+    cells.append(cell);
+  }
+}
+for (const input of document.querySelectorAll('.pin-entry')) {
+  for (const event of ['input', 'change', 'focus', 'keyup', 'select']) {
+    input.addEventListener(event, () => renderPin(input));
+  }
+  input.addEventListener('click', (event) => {
+    if (event.detail !== 1 || event.shiftKey || input.selectionStart !== input.selectionEnd) {
+      renderPin(input);
+      return;
+    }
+    const bounds = input.getBoundingClientRect();
+    const count = Math.max(6, input.value.length);
+    const position = Math.max(0, Math.min(input.value.length,
+      Math.round((event.clientX - bounds.left) / bounds.width * count)));
+    input.setSelectionRange(position, position);
+    renderPin(input);
+  });
+  renderPin(input);
+}
+
 for (const id of ['room-id', 'join-pin', 'create-pin']) {
   $(id).addEventListener('input', () => $(id).setCustomValidity(''));
 }
@@ -378,6 +413,7 @@ for (const action of ['create', 'join']) {
       if (action === 'create') body.name = $('room-name').value.trim();
       const room = await api(path, json(body));
       $(`${action}-pin`).value = '';
+      renderPin($(`${action}-pin`));
       showRoom(room);
       await refresh();
       status(`Joined ${room.name}.`);

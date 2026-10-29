@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NetDrop</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20261029c">
-  <script src="/static/app.js?v=20261029c" defer></script>
+  <link rel="stylesheet" href="/static/styles.css?v=20261030a">
+  <script src="/static/app.js?v=20261030a" defer></script>
 </head>
 <body>
   <main>
@@ -35,14 +35,14 @@
         <form id="join-form" novalidate>
           <label for="room-id">Room ID</label><input id="room-id" required pattern="[a-fA-F0-9]{12}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="room-id-help" placeholder="a1b2c3d4e5f6">
           <p id="room-id-help">12-character room ID · 0–9 and a–f</p>
-          <label for="join-pin">Enter room PIN</label><input id="join-pin" class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" required autocomplete="off" placeholder="••••••">
+          <label for="join-pin">Enter room PIN</label><div class="pin-control"><input id="join-pin" class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" required autocomplete="off" placeholder="••••••"><span class="pin-cells" aria-hidden="true"></span></div>
           <p class="field-hint">6–12 DIGITS · NUMERIC</p>
           <label for="join-display-name">Your name (optional)</label><input id="join-display-name" maxlength="40" autocomplete="nickname" placeholder="Guest name">
           <button class="primary-action" type="submit">Join room</button>
         </form>
         <form id="create-form" hidden novalidate>
           <label for="room-name">Room name</label><input id="room-name" required maxlength="60" placeholder="Study group">
-          <label for="create-pin">Choose a PIN</label><input id="create-pin" class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" required autocomplete="new-password" placeholder="••••••">
+          <label for="create-pin">Choose a PIN</label><div class="pin-control"><input id="create-pin" class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" required autocomplete="new-password" placeholder="••••••"><span class="pin-cells" aria-hidden="true"></span></div>
           <p class="field-hint">6–12 DIGITS · NUMERIC</p>
           <label for="create-display-name">Your name (optional)</label><input id="create-display-name" maxlength="40" autocomplete="nickname" placeholder="Guest name">
           <button class="primary-action" type="submit">Create room</button>
