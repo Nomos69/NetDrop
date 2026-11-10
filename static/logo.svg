@@ -3,8 +3,8 @@
   <desc id="desc">A file moving between two connected devices</desc>
   <defs>
     <linearGradient id="g" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#7c5cff"/>
-      <stop offset="1" stop-color="#4f31c8"/>
+      <stop stop-color="#3d3d3d"/>
+      <stop offset="1" stop-color="#171717"/>
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="16" fill="url(#g)"/>
