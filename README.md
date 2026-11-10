@@ -1,325 +1,341 @@
-# NetDrop
+<div align="center">
+  <img src="static/logo.svg" width="88" alt="NetDrop logo">
+  <h1>NetDrop</h1>
+  <p><strong>Temporary file and clipboard sharing for local networks and the web.</strong></p>
+  <p>Create a PIN-protected room, invite participants, and share files, text, and links in real time—directly from a browser.</p>
+  <p>
+    <img src="https://img.shields.io/badge/Python-3.12-282828?style=flat-square&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
+    <img src="https://img.shields.io/badge/FastAPI-ASGI-484848?style=flat-square&amp;logo=fastapi&amp;logoColor=white" alt="FastAPI ASGI">
+    <img src="https://img.shields.io/badge/WebSockets-Live_updates-686868?style=flat-square" alt="WebSocket live updates">
+    <img src="https://img.shields.io/badge/Brevo-Email_API-888888?style=flat-square" alt="Brevo email API">
+  </p>
+</div>
 
-Browser-based LAN sharing with temporary files, text, links, and optional Brevo API email invitations.
+## About NetDrop
 
-## Current status
+NetDrop is a lightweight, browser-based sharing application for classrooms,
+offices, laboratories, and small groups. A host creates a temporary room and
+participants join using a 12-character room ID and a 6–12 digit PIN. Everyone in
+the room can share files, notes, and links while WebSockets keep the feed and
+member list synchronized.
 
-Steps 1–8 are implemented: server configuration, interface, PIN-protected rooms, file/text/link sharing, live updates with reconnection, and automatic expiry/cleanup. Step 9: the user confirmed phone access, room joining, automatic file appearance, and downloading over the LAN. Step 11: verification and documentation cover the current LAN prototype. Brevo REST API room invitations are implemented; automatic new-file alerts remain planned. Real email delivery requires credentials and verification.
+NetDrop supports two environments:
 
-## Setup and run (Linux)
+| Mode | Best for | Connection |
+| --- | --- | --- |
+| **Local Network** | Fast sharing in the same room, office, or Wi-Fi network | Devices connect to the host computer's LAN address |
+| **Online** | Sharing between different networks | Participants connect to a separately deployed HTTPS server |
 
-From the NetDrop project folder:
+Each server owns its rooms and uploads. Local and online servers do not copy or
+synchronize data with one another.
+
+## Features
+
+- PIN-protected temporary rooms with cookie-based browser sessions
+- File uploads and attachment downloads with a configurable size limit
+- Shared text and validated HTTP/HTTPS links
+- Live room feed and member presence through WebSockets
+- Automatic reconnect and feed resynchronization
+- Multi-file upload queue with progress, cancel, and retry controls
+- Configurable content expiry and idle-room cleanup
+- Owner controls for deleting content, removing members, and closing rooms
+- Copyable invitation links and locally generated QR codes
+- Optional room invitations through the Brevo transactional email REST API
+- Responsive monochrome interface for desktop and mobile browsers
+- Health endpoint for Render and external uptime monitoring
+
+## How it works
+
+```text
+Host creates a room
+        │
+        ├── shares room ID + PIN
+        ├── copies invitation link
+        ├── displays QR invitation
+        └── sends optional Brevo email invitation
+                         │
+Participants join from a browser
+                         │
+Files, notes, links, members, and expiry updates stay synchronized
+```
+
+The invitation URL contains the room ID but never the PIN. Participants must
+enter the PIN after opening the link or scanning the QR code.
+
+## Technology
+
+| Layer | Technology | Role |
+| --- | --- | --- |
+| Backend | Python, FastAPI, Uvicorn | HTTP API, authorization, cleanup, and static delivery |
+| Realtime | WebSockets | Live feed, member presence, and reconnect updates |
+| Frontend | HTML, CSS, JavaScript | Responsive browser interface with no framework required |
+| Validation | Pydantic | Request and configuration validation |
+| QR invitations | qrcode | Server-generated SVG invitation codes |
+| Email invitations | Brevo REST API, HTTPX | Transactional room invitations |
+| Storage | Memory and temporary local files | Rooms/sessions in memory and uploads under `data/uploads/` |
+
+## Quick start
+
+### Requirements
+
+- Python 3.12 or a compatible Python 3 release
+- A modern browser
+- Devices on the same LAN for Local Network mode
+
+### Run locally
 
 ```bash
+git clone https://github.com/Nomos69/NetDrop.git
+cd NetDrop
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+cp .env.example .env
 python -m app.main
 ```
 
-Open http://127.0.0.1:8000 on the host. Stop the server with Ctrl+C.
-On another device on the same LAN, use `http://<host-LAN-IP>:8000`. Find the host address using `hostname -I`. The host firewall must permit the configured TCP port. Phone access and file sharing were confirmed by the user; see [verification results](docs/verification.md) for the exact scope.
+Open `http://127.0.0.1:8000` on the host computer.
 
-## Online uptime monitoring
+For another device on the same network, find the host address with:
 
-The public `/up` endpoint accepts GET and HEAD requests and returns HTTP 200 while
-the server is responding. GET returns `{"status":"ok"}`; HEAD returns headers
-without a response body. It does not create a room or browser session.
+```bash
+hostname -I
+```
 
-After deploying the endpoint to Render:
+Then open `http://HOST_LAN_IP:8000`, for example
+`http://192.168.1.12:8000`. The host firewall must allow the configured port.
 
-1. Open UptimeRobot and choose **Add New Monitor**.
-2. Select **HTTP(s)** and name it **NetDrop**.
-3. Enter `https://YOUR-SERVICE.onrender.com/up` as the URL.
-4. Set the monitoring interval to **5 minutes** and select your alert contact.
-5. Create the monitor and wait for its status to show **Up**.
+On Windows PowerShell, activate the environment with:
 
-No UptimeRobot API key or Python package is needed in NetDrop. The monitor
-runs externally, so the host computer can be off. Regular requests can help
-avoid Render Free's idle sleep, but cannot guarantee uptime or prevent restarts.
-Rooms still reset on server restart, and free-host local uploads are temporary.
-This endpoint checks HTTP responsiveness; it does not test file sharing or WebSockets.
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+## Using NetDrop
+
+1. Select **Local Network** or **Online**.
+2. Choose **Create a room**, enter a name, and create a 6–12 digit PIN.
+3. Share the room ID and PIN, copy the invitation link, show the QR code, or send
+   an email invitation.
+4. Participants open NetDrop, enter the room ID and PIN, and optionally choose a
+   display name.
+5. Share files, notes, or links. Room members receive updates automatically.
+6. Use **Leave room** to leave without closing it. The owner can use **Close
+   room** to revoke access and remove its shared content.
+
+Display names are participant-provided labels, not verified identities.
 
 ## Configuration
 
-Defaults work without a `.env` file. To customize them, copy `.env.example` to `.env` and edit it. Restart the server after changes. Existing environment variables take precedence over `.env` values.
+Copy `.env.example` to `.env`. Environment variables override values from the
+file, and the server must be restarted after changes.
 
-| Variable | Default | Purpose |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `NETDROP_HOST` | `0.0.0.0` | Listen on all host network interfaces |
-| `NETDROP_PORT` | `8000` | HTTP port, from 1 to 65535 |
-| `NETDROP_FILE_TTL_SECONDS` | `1800` | Lifetime of files, text, and links in seconds |
-| `NETDROP_MAX_UPLOAD_MB` | `100` | Upload limit in MiB |
-| `NETDROP_CLEANUP_INTERVAL_SECONDS` | `5` | Seconds between cleanup scans |
+| `NETDROP_HOST` | `0.0.0.0` | Address the server listens on |
+| `NETDROP_PORT` | `8000` | Local HTTP port |
+| `NETDROP_FILE_TTL_SECONDS` | `1800` | Lifetime of files, notes, and links |
+| `NETDROP_MAX_UPLOAD_MB` | `100` | Maximum size of each uploaded file |
+| `NETDROP_CLEANUP_INTERVAL_SECONDS` | `5` | Interval between cleanup scans |
+| `NETDROP_ROOM_IDLE_SECONDS` | `1800` | Idle time before an unused room is retired |
+| `NETDROP_SHARING_MODE` | `local` | This server's mode: `local` or `online` |
+| `NETDROP_LOCAL_URL` | empty | Reachable LAN origin used in local invitations |
+| `NETDROP_ONLINE_URL` | empty | Public HTTPS origin used in online invitations |
+| `BREVO_API_KEY` | empty | Optional Brevo API key; never commit this value |
+| `BREVO_SENDER_EMAIL` | empty | Sender verified in Brevo |
+| `BREVO_SENDER_NAME` | `NetDrop` | Sender name shown in invitation emails |
 
-The upload size limit is enforced while receiving each file. A file's lifetime begins after it is fully saved. Notes and links use the same lifetime from creation. New downloads are rejected at the expiry deadline, even between cleanup scans. Active downloads may finish; deletion waits until their response completes or disconnects. Expired content disappears from lists and live feeds on the next scan (normally within five seconds). The server creates `data/uploads/` on startup. Paths resolve relative to the project, and uploads are outside the public static directory.
-
-## Layout
-
-- `app/config.py`: configuration loading and validation.
-- `app/main.py`: server, homepage, and static assets.
-- `app/rooms.py`: room creation, PIN checks, and cookie-based membership.
-- `app/files.py`: authorized file uploads/downloads and text/link sharing.
-- `app/realtime.py`: authorized room WebSockets and live update signals.
-- `app/notifications.py`: Brevo REST API invitations, authorization, rate limits, and provider result handling.
-- `static/`: browser HTML, CSS, and JavaScript.
-- `tests/`: API, expiry, and browser checks.
-- `data/uploads/`: temporary runtime uploads, excluded from version control.
-
-See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the full plan. Brevo invitation setup is below; automatic new-file alerts remain a separate step. The LAN test record is in [docs/verification.md](docs/verification.md).
-
-## Using rooms
-
-Enter an optional display name when creating or joining a room. Blank names get
-a generated guest name. The **Room members** list shows joined browser sessions,
-marks your own entry with **You**, and updates automatically on joins and leaves.
-Green **Online** means at least one tab for that browser has a live connection;
-multiple tabs count as one member. Disconnections can take a moment to detect.
-Closing all tabs marks the member offline; **Leave room** removes the entry.
-Expired sessions disappear as the roster refreshes. Names are self-selected,
-not verified identities, and only room members can view the list.
-
-1. Create a room with a name and a 6–12 digit PIN.
-2. Share the displayed 12-character room ID and PIN with intended participants. Use the code shown inside the room, not its name. The join form tolerates spaces and uppercase letters in copied IDs.
-3. On another browser/device, enter that ID and PIN to join.
-4. Upload a file, write text, or share an HTTP/HTTPS link.
-5. Other participants see additions automatically and click a filename to download. Refresh remains available as a fallback. Live updates reconnect automatically and fetch the latest content after a connection interruption.
-6. Leave room removes that browser session's membership in the room.
-
-Room names and content are displayed as plain text. Files download as attachments, with server-generated storage names. Each room is limited to 500 items; the host supports up to 100 rooms and 1,000 active browser sessions. Join attempts are limited to five per minute per client IP, including successful attempts. Multiple users behind the same proxy share that limit. PINs are salted and hashed in memory.
-
-Browser sessions last 12 hours. Use a single server process: rooms, membership, and content indexes are in memory and reset on restart. After restart, old uploads are no longer listed or downloadable because room indexes reset. Startup and periodic cleanup remove generated upload filenames once their last-modified age exceeds the configured lifetime. Fresh orphaned uploads wait until that deadline; unrelated files and `.gitkeep` are preserved. Failed deletions are logged and retried. Local HTTP does not encrypt traffic; use this prototype on a trusted LAN.
-
-## Automated checks
-
-```bash
-source .venv/bin/activate
-python -m pip install -r requirements-dev.txt
-python -m unittest discover -s tests -v
-```
-
-Tests use temporary storage and cover sharing/access isolation, WebSocket authorization and revocation, expiry boundaries, background cleanup, orphan cleanup, deletion retries, and downloads crossing the expiry deadline.
-
-For the two-browser check (uses temporary storage and port 18765):
-
-```bash
-python -m playwright install chromium --no-shell
-python tests/browser_live.py
-```
-
-It checks room/PIN validation, pasted-input normalization, uploads/downloads in both directions, automatic updates, offline reconnection with missed content, expiry with an eight-second lifetime, mobile layout, and restart recovery. The normal server keeps its 30-minute default. Real-device LAN testing remains separate.
-
-## Step 9: real-device LAN checklist
-
-1. Run the server on the host and keep its terminal open.
-2. Connect the second device to the same Wi-Fi/LAN, then open `http://<host-Wi-Fi-IP>:8000` (not `127.0.0.1`).
-3. Create a room on the host and join it from the second device using its ID and PIN.
-4. Upload a small file on each device. Verify the other device sees it automatically and can download the correct contents.
-5. Share a note and link; verify both appear automatically.
-6. Temporarily disconnect the second device's Wi-Fi, share another note on the host, then reconnect. Verify the missed note appears.
-7. Check that an expired file disappears and its previous download URL no longer works. The automated browser test covers this using eight seconds; normal rooms use 30 minutes.
-
-If the second device cannot connect, check host firewall rules for the configured TCP port and router client isolation. No firewall rules are changed automatically. See `docs/verification.md` for the exact verification boundary.
-
-## Troubleshooting
-
-| Symptom | What to check |
-| --- | --- |
-| Page fails on the host | Run `python -m app.main` from the activated environment and leave the terminal open. Use the configured port. |
-| Page works on the host but fails on the phone | Use the computer's Wi-Fi IP, connect both devices to the same LAN, and check firewall/router client isolation. `127.0.0.1` on the phone points to the phone itself. |
-| Room ID format error | Enter the 12-character code shown inside the host's room, using digits and a–f. Refresh the phone page to load the latest form. |
-| PIN format error | Use 6–12 digits; keep leading zeros. |
-| Room ID or PIN is incorrect | Check the code and PIN. A host restart clears rooms, so create a new room afterward. |
-| Too many join attempts | Wait one minute before retrying; the limit applies per client IP. |
-| Live updates reconnecting | Check Wi-Fi, keep the host running, and use Refresh as a fallback. Returning to the page reconnects and fetches current content. |
-| File no longer downloads | It may have expired after 30 minutes or become unavailable after a host restart. Share it again if needed. |
-
-For this host's observed `192.168.1.0/24` LAN, the following narrow Ubuntu firewall rule permits access to the default port:
-
-```bash
-sudo ufw allow from 192.168.1.0/24 to any port 8000 proto tcp
-```
-
-Run it on the host, entering the administrator password locally. Adjust the subnet and port if your network or configuration differs. Do not disable the whole firewall. The Wi-Fi address can change after reconnecting; check `hostname -I` when needed.
-
-## Remaining work
-
-Brevo invitation API behavior is covered by mocked tests. Real provider acceptance and inbox delivery still require configured credentials and an intended test recipient. Automatic new-file notifications (step 10) remain planned. Real-phone reconnection and a full wall-clock 30-minute expiry observation are not yet confirmed; these behaviors have automated coverage using a shortened lifetime and exact deadline checks.
-
-## Local and Online sharing
-
-Use the **Local Network / Online** tabs before creating or joining a room:
-
-- **Local** uses the host on the same Wi-Fi/LAN and works without internet.
-- **Online** opens the configured public HTTPS server for people on different networks.
-
-Each server owns its rooms, sessions, and uploads. Switching servers does not copy
-files or rooms. Both modes keep the room PIN, upload limits, authorization, live
-updates, and expiry. The room screen shows its mode and a copyable invitation link.
-Opening an invitation fills the room ID; the recipient must still enter the PIN.
-Clipboard access may be unavailable over LAN HTTP; select and copy the displayed
-link manually in that case.
-
-### Configure the local host
-
-Add to the local `.env`, replacing the addresses with your own:
+Example local configuration:
 
 ```dotenv
 NETDROP_SHARING_MODE=local
 NETDROP_LOCAL_URL=http://192.168.1.12:8000
-NETDROP_ONLINE_URL=https://YOUR-SERVICE.onrender.com
+NETDROP_ONLINE_URL=https://your-service.onrender.com
 ```
 
-Run with `python -m app.main`. Keep the LAN address current if it changes.
-`NETDROP_ONLINE_URL` pre-fills the Online connection field. If it is empty,
-participants can paste a complete HTTPS server address or invitation link.
-Click **Connect to online server**, then enter the room PIN on that server. If the local URL is empty,
-links use the current browser address; a localhost address only works on the host.
-The mode tabs route to servers; it does not restrict the host's network
-exposure. Keep the local server accessible only within the trusted LAN.
+Example online configuration:
 
-### Configure an online server
+```dotenv
+NETDROP_SHARING_MODE=online
+NETDROP_ONLINE_URL=https://your-service.onrender.com
+```
 
-Deploy this repository as a Python web service with one worker:
+Use only the HTTPS origin for `NETDROP_ONLINE_URL`: no path, query, fragment, or
+credentials.
 
-- Build command: `pip install -r requirements.txt`
-- Start command: `uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --proxy-headers`
-- Health check path: `/up`
-- Environment: `NETDROP_SHARING_MODE=online` and
-  `NETDROP_ONLINE_URL=https://YOUR-SERVICE.onrender.com`.
-- Configure Uvicorn's `FORWARDED_ALLOW_IPS` to trust the hosting reverse proxy so
-  HTTPS and secure WebSocket requests retain their external scheme. On a service
-  whose backend is reachable exclusively through its trusted proxy, `*` can be
-  used; do not use that setting for a directly exposed backend.
-- Optionally set `NETDROP_LOCAL_URL` so participants can open your LAN host when
-  they are on that LAN. Otherwise participants can enter a local host address manually.
+## Deploy on Render
 
-The online server rejects non-HTTPS application requests and non-secure WebSockets;
-`/up` remains available for internal health checks. The hosting service supplies
-HTTPS. Setting the public URL alone does not deploy a server or establish public
-connectivity. Do not expose a local development server by forwarding a router port.
+Create a **Web Service** from this repository and use:
 
-Use a single process: rooms and content indexes still reset on restart. Uploads
-require writable disk and remain temporary; this change adds no durable database,
-object storage, or automatic replication. An online deployment must be tested on
-separate networks before claiming real-world online sharing is verified.
+| Render setting | Value |
+| --- | --- |
+| Runtime | Python 3 |
+| Build command | `pip install -r requirements.txt` |
+| Start command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers` |
+| Health check path | `/up` |
 
-To check both modes locally using temporary storage and a test TLS certificate:
+Add these environment variables in **Render → Environment**:
+
+```text
+NETDROP_SHARING_MODE=online
+NETDROP_ONLINE_URL=https://YOUR-EXACT-SERVICE.onrender.com
+```
+
+Use one worker and one service instance. NetDrop stores rooms, browser sessions,
+members, and content indexes in process memory, so multiple workers would not
+share the same state.
+
+Render supplies HTTPS, but free instances and their files are temporary. A
+restart or redeployment clears rooms and may remove uploads. The `/up` endpoint
+only confirms that the HTTP service responds; it does not test rooms, uploads, or
+WebSockets.
+
+## Brevo email invitations
+
+NetDrop uses Brevo's transactional **HTTPS REST API**, not an SMTP connection.
+
+1. In Brevo, open **Settings → SMTP & API → API Keys & MCP**.
+2. Generate a restricted API key named `NetDrop`.
+3. Give it **Transactional email → All** permission and leave unrelated
+   permissions disabled.
+4. Verify a sender address. For reliable inbox delivery, use a domain you own and
+   authenticate its DKIM and DMARC records.
+5. Add the following secrets to `.env` or Render Environment:
+
+```dotenv
+BREVO_API_KEY=your-private-api-key
+BREVO_SENDER_EMAIL=your-verified-sender@example.com
+BREVO_SENDER_NAME=NetDrop
+```
+
+Only the room owner can send an invitation. The owner must confirm the room PIN,
+which is included in that email but is not persisted as plaintext by NetDrop.
+Invitations are limited to one attempt every 30 seconds and 10 attempts per hour
+per browser session. Duplicate attempts to the same room and recipient are
+blocked for five minutes.
+
+Brevo API acceptance does not prove inbox placement. Check Brevo's transactional
+logs and the recipient's spam folder when troubleshooting delivery.
+
+## Security and privacy
+
+- PINs are salted and hashed with `scrypt` in server memory.
+- PINs are excluded from invitation links, QR codes, access logs, and application
+  logs.
+- Room membership and owner operations are checked on the server.
+- Cross-site writes require NetDrop's custom request header.
+- Uploads use server-generated storage names outside the public static directory.
+- Files download as attachments and expire at the configured deadline.
+- Unsafe or expired download requests are rejected.
+- Notification logs exclude recipients, PINs, message bodies, and API keys.
+- Online mode requires HTTPS and secure WebSockets.
+
+Local mode uses HTTP and does not encrypt network traffic. Use it only on a
+trusted LAN. NetDrop is a temporary-sharing prototype, not permanent cloud
+storage or an identity platform.
+
+## Data lifecycle and limits
+
+- Files, notes, and links expire after 30 minutes by default.
+- New downloads are refused at the exact expiry deadline.
+- Active transfers can finish before their files are removed.
+- Rooms retire after the configured idle period when no live members or transfers
+  remain.
+- A server restart clears all room, membership, ownership, and content indexes.
+- The prototype supports up to 100 rooms, 500 items per room, and 1,000 active
+  browser sessions in one process.
+- Join attempts are limited to five per minute per client IP.
+
+## Project structure
+
+```text
+NetDrop/
+├── app/
+│   ├── config.py          # Environment loading and validation
+│   ├── main.py            # FastAPI application and health endpoint
+│   ├── rooms.py           # Rooms, sessions, PINs, ownership, and QR codes
+│   ├── files.py           # Files, notes, links, expiry, and cleanup
+│   ├── realtime.py        # Authorized WebSocket updates
+│   └── notifications.py   # Brevo invitation API integration
+├── static/
+│   ├── index.html         # Browser interface
+│   ├── styles.css         # Responsive monochrome design
+│   ├── app.js             # Client behavior and live updates
+│   ├── logo.svg
+│   └── favicon.svg
+├── tests/                 # API and browser workflow checks
+├── docs/                  # Verification notes and project documents
+├── data/uploads/          # Temporary runtime uploads; ignored by Git
+├── .env.example
+├── PROJECT_PLAN.md
+└── requirements.txt
+```
+
+## Testing
+
+Install development dependencies and run the API suite:
 
 ```bash
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+python -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+Install Chromium for Playwright, then run the browser workflows:
+
+```bash
+python -m playwright install chromium --no-shell
+python tests/browser_live.py
 python tests/browser_modes.py
-```
-
-### Connection screen troubleshooting
-
-The compact connection card uses Local Network / Online tabs and Join / Create
-room actions. PINs remain 6–12 digits and room IDs remain 12 characters. The UI
-uses versioned assets, and the homepage is served without caching to avoid mixing
-old scripts with a new screen. Settings requests time out after ten seconds; a
-failed or missing `/api/sharing` endpoint leaves the tabs and invite-link field
-usable, with a visible retry action. Restart an older server after updating code.
-
-Public HTTPS hosts automatically identify as Online and use their current origin
-when no online URL was configured. Local/private hosts retain Local mode unless
-explicitly configured otherwise. Behind a reverse proxy, preserve the HTTPS scheme
-using the trusted proxy configuration described above.
-
-The current checkout's ignored `.env` points Online to
-`https://netdrop-r51l.onrender.com`. This is local configuration; changing the
-source here does not update the deployed Render service. Deploy the updated
-repository to show this screen on that public service.
-
-## Room ownership and invitations
-
-The browser session that creates a room owns it. Only that owner can close the
-room, remove another member, or delete any shared file, note, or link. These
-checks run on the server. Leaving does not close a room; rejoining from the same
-unexpired browser session restores the owner's controls. Ownership cannot be
-recovered from the PIN alone after the creator's session expires.
-
-Removing a member immediately revokes that browser session's access and live
-connection. It is not a permanent ban: someone with the PIN can rejoin. Closing a
-room revokes everyone's access and deletes its content. Already-running downloads
-may finish; their files are removed afterward. A cancelled upload might already
-have reached the server, so inspect the feed before retrying or delete the item as
-the owner.
-
-Open **Show invitation QR code** inside a room to display a locally generated QR
-code. It contains the same invitation URL as the copy button, never the PIN.
-Scanning opens the join form; the recipient still enters the PIN. Local QR codes
-require the same LAN and a reachable host address. Configure `NETDROP_LOCAL_URL`
-if the host uses localhost; a localhost QR code will not connect a phone.
-
-## Upload queue and expiry countdowns
-
-Choose multiple files, then click **Upload files**. Files upload one at a time,
-with a progress bar and a separate result for each file. **Cancel** stops a queued
-or active upload; **Retry** resubmits a cancelled or failed upload. A failed file
-does not stop later files. Oversized files are rejected individually. Progress
-reaching 100% means the browser sent the bytes; **Shared** confirms the server
-saved the file. Network failures can leave the outcome uncertain: check the feed
-before retrying to avoid duplicates.
-
-Leaving or losing room access cancels the browser's upload queue. The queue is
-kept only in the current page and is not resumed after a reload. Each shared item
-shows a countdown; it uses the device clock, while server time remains the source
-of truth for expiry. Expired entries disappear on the next cleanup update.
-
-## Idle-room cleanup
-
-`NETDROP_ROOM_IDLE_SECONDS` defaults to `1800` (30 minutes). A room is eligible
-for cleanup after that period without an authorized request, live browser
-connection, or file transfer. The idle timer restarts when the last live tab
-disconnects or a download ends. Closing a tab does not immediately close its room.
-Cleanup revokes old memberships and removes the room's content, freeing room
-capacity. Active uploads and downloads prevent automatic room retirement.
-
-Additional isolated checks:
-
-```bash
 python tests/browser_controls.py
+python tests/browser_notifications.py
 ```
 
-This uses temporary storage and port 18768 to check owner controls, upload batches,
-progress, cancellation, retry, expiry countdowns, QR display, and mobile layout.
+The automated checks cover authorization, room isolation, live updates,
+reconnection, expiration, cleanup, ownership, uploads, mode switching, QR codes,
+Brevo request behavior, and responsive layouts. Browser checks use isolated local
+servers and mocked provider responses; they do not prove a public deployment or
+real email delivery.
 
+See [docs/verification.md](docs/verification.md) for recorded evidence and its
+boundaries.
 
-## Brevo email invitations (REST API)
+## Troubleshooting
 
-NetDrop sends `POST https://api.brevo.com/v3/smtp/email` with JSON and an
-`api-key` header. Despite `smtp` in the API path, this is an HTTPS REST API
-integration, not an SMTP connection.
+| Problem | Check |
+| --- | --- |
+| Phone cannot open the local host | Use the computer's LAN IP, connect both devices to the same network, and check the firewall and router client isolation |
+| `127.0.0.1` fails on another device | That address points to the device itself; use the host computer's LAN IP |
+| Room ID or PIN is rejected | Use the 12-character room ID and the original 6–12 digit PIN; a restart invalidates old rooms |
+| Live updates keep reconnecting | Check connectivity, keep the host running, and use **Refresh** as a fallback |
+| File disappeared | It expired, the owner deleted it, the room closed, or the server restarted |
+| Render deploy times out after startup | Set the Render health check path to `/up` |
+| Invitation shows the wrong hostname | Set `NETDROP_LOCAL_URL` or `NETDROP_ONLINE_URL` to the exact reachable origin and create a new room |
+| Email lands in spam | Authenticate the sender domain with DKIM and DMARC and inspect Brevo transactional logs |
 
-1. In Brevo, verify your sender (and authenticate its domain as required), then
-   create an **API key** under **SMTP & API → API Keys**. Do not use an SMTP key.
-2. Set these values in the host `.env` or hosting environment:
-   ```dotenv
-   BREVO_API_KEY=your-private-api-key
-   BREVO_SENDER_EMAIL=your-verified-sender@example.com
-   BREVO_SENDER_NAME=NetDrop
-   ```
-3. Set `NETDROP_LOCAL_URL` to the host LAN origin for local rooms, or
-   `NETDROP_ONLINE_URL` to the public HTTPS origin for online rooms. Restart NetDrop.
-4. Create a room. Under **Email a room invitation**, enter an intended recipient's
-   email and re-enter the room PIN, then choose **Email invitation**.
-5. Confirm the accepted status, check Brevo transactional logs, and verify receipt
-   in the destination inbox/spam folder. Acceptance alone does not prove delivery.
+## Current status and roadmap
 
-The email contains the room ID, PIN, and join link. It does not implement a new
-OTP/login system. Only the room owner can send; the PIN is verified against the
-existing hash, used for that email, and never persisted in plaintext by NetDrop.
-Copy links and QR codes still exclude the PIN. Local invitations require the same
-LAN; sending email needs internet access on the host.
+Implemented:
 
-Limits: 30 seconds between attempts and 10 attempts/hour per browser session;
-repeat attempts to the same recipient/room are blocked for five minutes. These
-in-memory safeguards reset with the server and are not a public-service abuse
-prevention system. There is no persistent outbox or background delivery queue.
-HTTP requests use five-second timeouts; explicit HTTP 429 responses retry at most
-twice with short waits (long Retry-After values stop immediately). Timeouts and
-server errors are not retried automatically because delivery may already have
-occurred. Logs record event ID, attempt, and status without recipient, PIN,
-message content, API key, or raw provider errors. File sharing remains independent.
+- Local and online room modes
+- Temporary file, text, and link sharing
+- Live updates, reconnection, and member presence
+- Owner controls, QR invitations, upload queue, expiry, and cleanup
+- Brevo REST API room invitations
+- Responsive desktop and mobile interface
 
-Provider reference: https://developers.brevo.com/reference/send-transac-email
-Automatic new-file alerts and delivery webhooks are not implemented.
+Planned or optional:
+
+- Persistent room and retry state using SQLite or another durable store
+- Durable object storage for hosted uploads
+- Brevo delivery webhooks and delivery-state display
+- Automatic opt-in notifications after new uploads
+- Packaged desktop launchers for supported operating systems
+
+The detailed implementation phases are documented in
+[PROJECT_PLAN.md](PROJECT_PLAN.md).
+
+---
+
+NetDrop is designed for short-lived collaboration. Share only with intended room
+participants and treat every room as temporary.
