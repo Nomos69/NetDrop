@@ -1,10 +1,10 @@
 # NetDrop
 
-Browser-based LAN sharing with temporary files, text, links, and planned external notifications.
+Browser-based LAN sharing with temporary files, text, links, and optional Brevo API email invitations.
 
 ## Current status
 
-Steps 1–8 are implemented: server configuration, interface, PIN-protected rooms, file/text/link sharing, live updates with reconnection, and automatic expiry/cleanup. Step 9: the user confirmed phone access, room joining, automatic file appearance, and downloading over the LAN. Step 11: verification and documentation cover the current LAN prototype. Step 10 external notifications remain planned; their tests must be added when implemented.
+Steps 1–8 are implemented: server configuration, interface, PIN-protected rooms, file/text/link sharing, live updates with reconnection, and automatic expiry/cleanup. Step 9: the user confirmed phone access, room joining, automatic file appearance, and downloading over the LAN. Step 11: verification and documentation cover the current LAN prototype. Brevo REST API room invitations are implemented; automatic new-file alerts remain planned. Real email delivery requires credentials and verification.
 
 ## Setup and run (Linux)
 
@@ -61,12 +61,12 @@ The upload size limit is enforced while receiving each file. A file's lifetime b
 - `app/rooms.py`: room creation, PIN checks, and cookie-based membership.
 - `app/files.py`: authorized file uploads/downloads and text/link sharing.
 - `app/realtime.py`: authorized room WebSockets and live update signals.
-- `app/notifications.py`: placeholder for external alerts.
+- `app/notifications.py`: Brevo REST API invitations, authorization, rate limits, and provider result handling.
 - `static/`: browser HTML, CSS, and JavaScript.
 - `tests/`: API, expiry, and browser checks.
 - `data/uploads/`: temporary runtime uploads, excluded from version control.
 
-See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the full plan. Next: verify the notification provider before step 10. The LAN test record is in [docs/verification.md](docs/verification.md).
+See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the full plan. Brevo invitation setup is below; automatic new-file alerts remain a separate step. The LAN test record is in [docs/verification.md](docs/verification.md).
 
 ## Using rooms
 
@@ -144,7 +144,7 @@ Run it on the host, entering the administrator password locally. Adjust the subn
 
 ## Remaining work
 
-External notifications (step 10) require verified provider documentation, a supported delivery channel, credentials, and consenting test recipients. Notification delivery/failure/retry testing is not included in the current LAN test results. Real-phone reconnection and a full wall-clock 30-minute expiry observation are not yet confirmed; these behaviors have automated coverage using a shortened lifetime and exact deadline checks.
+Brevo invitation API behavior is covered by mocked tests. Real provider acceptance and inbox delivery still require configured credentials and an intended test recipient. Automatic new-file notifications (step 10) remain planned. Real-phone reconnection and a full wall-clock 30-minute expiry observation are not yet confirmed; these behaviors have automated coverage using a shortened lifetime and exact deadline checks.
 
 ## Local and Online sharing
 
@@ -282,3 +282,44 @@ python tests/browser_controls.py
 
 This uses temporary storage and port 18768 to check owner controls, upload batches,
 progress, cancellation, retry, expiry countdowns, QR display, and mobile layout.
+
+
+## Brevo email invitations (REST API)
+
+NetDrop sends `POST https://api.brevo.com/v3/smtp/email` with JSON and an
+`api-key` header. Despite `smtp` in the API path, this is an HTTPS REST API
+integration, not an SMTP connection.
+
+1. In Brevo, verify your sender (and authenticate its domain as required), then
+   create an **API key** under **SMTP & API → API Keys**. Do not use an SMTP key.
+2. Set these values in the host `.env` or hosting environment:
+   ```dotenv
+   BREVO_API_KEY=your-private-api-key
+   BREVO_SENDER_EMAIL=your-verified-sender@example.com
+   BREVO_SENDER_NAME=NetDrop
+   ```
+3. Set `NETDROP_LOCAL_URL` to the host LAN origin for local rooms, or
+   `NETDROP_ONLINE_URL` to the public HTTPS origin for online rooms. Restart NetDrop.
+4. Create a room. Under **Email a room invitation**, enter an intended recipient's
+   email and re-enter the room PIN, then choose **Email invitation**.
+5. Confirm the accepted status, check Brevo transactional logs, and verify receipt
+   in the destination inbox/spam folder. Acceptance alone does not prove delivery.
+
+The email contains the room ID, PIN, and join link. It does not implement a new
+OTP/login system. Only the room owner can send; the PIN is verified against the
+existing hash, used for that email, and never persisted in plaintext by NetDrop.
+Copy links and QR codes still exclude the PIN. Local invitations require the same
+LAN; sending email needs internet access on the host.
+
+Limits: 30 seconds between attempts and 10 attempts/hour per browser session;
+repeat attempts to the same recipient/room are blocked for five minutes. These
+in-memory safeguards reset with the server and are not a public-service abuse
+prevention system. There is no persistent outbox or background delivery queue.
+HTTP requests use five-second timeouts; explicit HTTP 429 responses retry at most
+twice with short waits (long Retry-After values stop immediately). Timeouts and
+server errors are not retried automatically because delivery may already have
+occurred. Logs record event ID, attempt, and status without recipient, PIN,
+message content, API key, or raw provider errors. File sharing remains independent.
+
+Provider reference: https://developers.brevo.com/reference/send-transac-email
+Automatic new-file alerts and delivery webhooks are not implemented.

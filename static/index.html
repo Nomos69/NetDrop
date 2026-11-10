@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NetDrop</title>
   <link rel="stylesheet" href="/static/styles.css?v=20261030a">
-  <script src="/static/app.js?v=20261030a" defer></script>
+  <script src="/static/app.js?v=20261110a" defer></script>
 </head>
 <body>
   <main>
@@ -60,6 +60,14 @@
         <button id="copy-invite" type="button" class="secondary">Copy invitation link</button>
         <details id="qr-invite"><summary>Show invitation QR code</summary><img id="invite-qr" width="220" height="220" alt="QR code for this room invitation"><p>Scan to open the invitation, then enter the PIN. The same network requirements apply.</p></details>
         <p id="invite-help">Share the PIN separately. Opening this link still requires the room PIN.</p>
+        <form id="email-invitation" hidden>
+          <h2>Email a room invitation</h2>
+          <p>Send the room ID, PIN, and join link to an intended participant. Email requires internet access on the host.</p>
+          <label for="invite-email">Recipient email</label><input id="invite-email" type="email" maxlength="254" required autocomplete="off">
+          <label for="invite-pin">Confirm room PIN</label><input id="invite-pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" maxlength="12" required autocomplete="off">
+          <button type="submit">Email invitation</button>
+          <p id="email-result" role="status" aria-live="polite"></p>
+        </form>
       </section>
       <section class="card members-card" aria-labelledby="members-heading">
         <div class="room-heading"><h2 id="members-heading">Room members</h2><span id="member-count" role="status" aria-live="polite"></span></div>

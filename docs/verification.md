@@ -158,3 +158,29 @@ Greppoo setup and actual external notification delivery remain deferred.
 All browser tests use temporary storage and loopback servers. The new results do
 not establish physical-phone QR scanning, full-duration expiry, public deployment,
 or sharing between separate physical networks. Those checks remain pending above.
+
+## Brevo REST API invitations — 2026-11-10
+
+Implemented owner-requested email invitations using Brevo's transactional HTTPS
+API, replacing the proposed Greppoo provider for this workflow. These invitations
+contain the room ID, owner-confirmed PIN, and configured join link. Automatic
+new-file alerts remain planned.
+
+Local automated evidence: the full suite passed 40 tests after initial
+integration. Two further notification tests passed in an eight-test focused run.
+Coverage includes the API payload, owner/session/header authorization, malformed
+input, PIN validation, duplicate suppression, rate limits, bounded 429 retries,
+long Retry-After and server-error handling, ambiguous timeout handling, missing
+configuration, malformed acceptance, and successful upload/download after email
+failure. Provider responses were mocked: no real emails were sent.
+
+Real-provider acceptance, inbox delivery, deployment and physical-device email
+invitation use remain unverified. Follow the Brevo setup steps in README.md and
+use an intended recipient to gather that evidence.
+
+Browser evidence: `tests/browser_notifications.py` passed at 1280px and 390px.
+The checks exercised the real local invitation endpoint with mocked Brevo
+responses, accepted/rate-limit feedback, owner-only form visibility, clearing the
+PIN after submission, and absence of horizontal overflow or JavaScript errors.
+Both rendered form screenshots were visually inspected. No physical device or
+real provider was used for these browser checks.

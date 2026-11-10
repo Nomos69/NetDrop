@@ -35,6 +35,11 @@ MAX_UPLOAD_BYTES = positive_integer("NETDROP_MAX_UPLOAD_MB", 100) * 1024 * 1024
 
 ROOM_IDLE_SECONDS = positive_integer("NETDROP_ROOM_IDLE_SECONDS", 1800)
 
+# Brevo HTTPS API credentials stay on the server; SMTP keys do not work here.
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "").strip()
+BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "").strip()
+BREVO_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "NetDrop").strip() or "NetDrop"
+
 CLEANUP_INTERVAL_SECONDS = positive_integer("NETDROP_CLEANUP_INTERVAL_SECONDS", 5)
 
 # Each server owns its rooms. Switching mode opens the corresponding server.

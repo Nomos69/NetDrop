@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import config, files, realtime, rooms
+from app import config, files, notifications, realtime, rooms
 
 
 @asynccontextmanager
@@ -53,6 +53,7 @@ async def sharing(request: Request):
 
 
 app.include_router(rooms.router)
+app.include_router(notifications.router)
 app.include_router(files.router)
 app.include_router(realtime.router)
 app.mount("/static", StaticFiles(directory=config.STATIC_DIR), name="static")

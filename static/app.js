@@ -97,6 +97,9 @@ async function loadSharingSettings() {
 $('retry-settings').addEventListener('click', loadSharingSettings);
 
 function showInvitation(room) {
+  $('email-invitation').hidden = !room.is_owner;
+  $('email-invitation').reset();
+  $('email-result').textContent = '';
   const base = sharingConfig[`${room.mode}_url`] || location.origin;
   const link = new URL(base);
   // A fragment keeps the room ID out of server access logs. PINs are never included.
@@ -122,6 +125,27 @@ $('copy-invite').addEventListener('click', async () => {
     $('invite-link').focus();
     $('invite-link').select();
     status('Select and copy the invitation link above.');
+  }
+});
+
+$('email-invitation').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!activeRoom?.is_owner) return;
+  const button = event.currentTarget.querySelector('button');
+  button.disabled = true;
+  $('email-result').textContent = 'Sending invitation…';
+  try {
+    const result = await api(`/rooms/${activeRoom.id}/email-invitation`, {
+      ...json({ email: $('invite-email').value.trim(), pin: $('invite-pin').value }),
+      signal: AbortSignal.timeout(25000),
+    });
+    $('email-result').textContent = result.message;
+  } catch (error) {
+    $('email-result').textContent = error.name === 'TimeoutError'
+      ? 'Email acceptance is unknown. Check the inbox before trying again.' : error.message;
+  } finally {
+    $('invite-pin').value = '';
+    button.disabled = false;
   }
 });
 

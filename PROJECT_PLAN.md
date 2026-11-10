@@ -1,6 +1,6 @@
 # NetDrop project plan
 
-Status: steps 1–8 of the implementation procedure are implemented, including live updates, reconnect resync, expiry, and cleanup. Step 9 core LAN access/sharing is confirmed by the user on a phone. Step 11 verification and documentation cover the current LAN prototype; remaining real-device observations are listed in docs/verification.md. Step 10 external alerts remain unimplemented.
+Status: steps 1–8 of the implementation procedure are implemented, including live updates, reconnect resync, expiry, and cleanup. Step 9 core LAN access/sharing is confirmed by the user on a phone. Step 11 verification and documentation cover the current LAN prototype; remaining real-device observations are listed in docs/verification.md. Brevo REST API room invitations are implemented. Step 10 automatic new-file alerts remain unimplemented.
 
 ## Basis and scope
 
@@ -15,7 +15,7 @@ Working assumptions to confirm before the affected phase:
 - Rooms use PIN-protected access; browser sessions retain room authorization without putting PINs in URLs.
 - Start with one host process, local file storage, and in-memory room state. Restart behavior must be documented.
 - Prototype defaults: 100 MiB uploads of any file type as download attachments; 100 rooms; 500 active items per room. Notes and links share the configured 30-minute lifetime.
-- No delivery channel, endpoint, price, quota, or delivery guarantee is assumed for Greppoo Notification Hub.
+- Brevo replaces the proposed Greppoo Notification Hub. Email invitations use the verified transactional HTTPS API; actual inbox delivery remains to be verified.
 
 ## Scope boundaries
 
@@ -56,7 +56,7 @@ Use plain HTML/CSS/JavaScript with FastAPI and Uvicorn. Add HTTPX when integrati
 ### Phase 0 — Resolve requirements and verify the provider
 
 1. Agree on room creation/joining, host controls, upload limits, expiry behavior, and restart behavior.
-2. Obtain the official Notification Hub documentation and confirm authentication, supported channels, recipient setup, request/response schema, quotas, timeouts, and retry/idempotency support.
+2. Use the official Brevo transactional API documentation and confirm authentication, supported channels, recipient setup, request/response schema, quotas, timeouts, and retry/idempotency support.
 3. Choose one supported channel and a test recipient with consent. Establish whether provider acceptance and actual delivery can be measured separately.
 
 Completion: a short confirmed requirements list and provider contract. Missing API access blocks external alerts, but does not block the LAN phases.
@@ -124,5 +124,14 @@ belongs to the creating browser session; member removal permits rejoining with t
 PIN. Existing downloads retain their deletion leases. Idle time defaults to 30
 minutes and is configurable with `NETDROP_ROOM_IDLE_SECONDS`.
 
-Greppoo notifications remain deferred. Physical-device and public cross-network
+Brevo API invitations are implemented; automatic new-file notifications remain deferred. Physical-device and public cross-network
 verification still require the device checklist in `docs/verification.md`.
+
+
+### Brevo invitation integration — November 2026
+
+The selected integration sends owner-requested room ID/PIN/link invitations via
+Brevo REST API. This is separate from Phase 4 new-file alerts: no automatic upload
+notifications or recipient subscriptions have been added. See README.md for setup,
+rate limits, retry behavior, and real-delivery verification. Credentials stay on
+the backend; mocked API tests do not establish real email delivery.

@@ -153,7 +153,7 @@ def cleanup_room(room):
     changed = False
     for item_id, item in list(room["items"].items()):
         if not expired(item):
-            continue
+            continue    
         if not item.get("_expiry_notified"):
             item["_expiry_notified"] = True
             changed = True  
