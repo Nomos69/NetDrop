@@ -32,6 +32,7 @@ input[type='file']::file-selector-button:hover { border-color: #555; background:
 textarea { resize: vertical; }
 .pin-control { position: relative; }
 .pin-entry { position: relative; z-index: 1; height: 56px; font-size: 22px; color: transparent; caret-color: transparent; background: transparent; border-radius: 7px; }
+.pin-entry:hover, .pin-entry:focus { background: transparent; }
 .pin-entry::placeholder { color: transparent; }
 .pin-entry::selection { color: transparent; background: transparent; }
 .pin-cells { position: absolute; inset: 1px; display: grid; grid-template-columns: repeat(var(--pin-slots, 6), minmax(0, 1fr)); overflow: hidden; border-radius: 6px; pointer-events: none; }
