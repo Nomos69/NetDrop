@@ -46,7 +46,7 @@ async def send_email(payload, event_id):
                 if not isinstance(message_id, str) or not message_id:
                     raise HTTPException(502, "Email acceptance could not be confirmed. Check the recipient inbox before trying again.")
                 logger.info("email event=%s attempt=%s state=accepted", event_id, attempt)
-                return {"status": "accepted", "message": "Brevo accepted the invitation. Inbox delivery is not yet confirmed."}
+                return {"status": "accepted", "message": "Invitation sent. Ask the recipient to check their inbox or spam folder."}
             logger.warning("email event=%s attempt=%s state=rejected http=%s", event_id, attempt, response.status_code)
             if response.status_code == 429 and attempt < 3:
                 try:
