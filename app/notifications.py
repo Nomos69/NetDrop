@@ -1,6 +1,7 @@
-"""Optional Brevo email invitations and upload alerts; delivery never blocks LAN sharing."""
+"""Optional Brevo invitations and file activity alerts; delivery never blocks LAN sharing."""
 
 import asyncio
+import base64
 import hashlib
 import logging
 import secrets
@@ -76,23 +77,37 @@ async def send_email(payload, event_id):
 
 def queue_upload_alerts(room, item):
     """Fire-and-forget after local commit; failure never changes upload success."""
+    queue_file_alerts(room, item, "upload")
+
+
+def queue_download_alerts(room, item):
+    """Notify subscribers only after the file response finishes sending."""
+    queue_file_alerts(room, item, "download")
+
+
+def queue_file_alerts(room, item, event):
     if not enabled() or not room.get("subscriptions"):
         return
     for subscription in room["subscriptions"].values():
         if subscription["enabled"]:
-            asyncio.create_task(send_upload_alert(room, item, subscription["email"]))
+            asyncio.create_task(send_file_alert(room, item, subscription["email"], event))
 
 
-async def send_upload_alert(room, item, email):
-    if room.get("closed") or item.get("expires_at", float("inf")) <= time.time():
+async def send_file_alert(room, item, email, event):
+    action = "uploaded" if event == "upload" else "downloaded"
+    try:
+        content = await asyncio.to_thread(item["path"].read_bytes)
+    except OSError:
+        logger.warning("email file event skipped because attachment is unavailable")
         return
-    text = (f'A new file is available in NetDrop room: {room["name"]}.\n'
-            'Open NetDrop and enter the room details you received separately. '
-            'This alert contains no room PIN, file name, or file contents.')
+    attachment = {"name": item["name"], "content": base64.b64encode(content).decode("ascii")}
+    text = (f'A file was {action} in NetDrop room: {room["name"]}.\n'
+            f'File name: {item["name"]}\n'
+            'The file is attached to this email. This alert contains no room PIN.')
     payload = {"sender": {"email": config.BREVO_SENDER_EMAIL, "name": config.BREVO_SENDER_NAME},
-               "to": [{"email": email}], "subject": "New NetDrop upload available",
+               "to": [{"email": email}], "subject": f"NetDrop file {action}",
                "textContent": text, "htmlContent": "<html><body><pre>" + escape(text) + "</pre></body></html>",
-               "tags": ["netdrop-upload-alert"]}
+               "attachment": [attachment], "tags": [f"netdrop-file-{event}"]}
     await send_email(payload, secrets.token_hex(12))
 
 
@@ -102,9 +117,9 @@ async def subscription(body: Subscription, room=Depends(rooms.authorize)):
     key = fingerprint(body.email)
     if body.enabled:
         subscriptions[key] = {"email": body.email.lower(), "enabled": True}
-        return {"enabled": True, "message": "Upload alerts enabled for this email address."}
+        return {"enabled": True, "message": "File activity alerts enabled for this email address."}
     subscriptions.pop(key, None)
-    return {"enabled": False, "message": "Upload alerts disabled for this email address."}
+    return {"enabled": False, "message": "File activity alerts disabled for this email address."}
 
 
 @router.post("/rooms/{room_id}/email-invitation", dependencies=[Depends(rooms.browser_write)])

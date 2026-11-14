@@ -237,12 +237,17 @@ class DownloadResponse(FileResponse):
             await response(scope, receive, send)
             return
         self.item["_downloads"] = self.item.get("_downloads", 0) + 1
+        completed = False
         try:
             # Do not hand off a path to the server: the lease covers actual bytes sent.
             scope = {**scope, "extensions": {key: value for key, value in scope.get("extensions", {}).items()
                                              if key != "http.response.pathsend"}}
             await super().__call__(scope, receive, send)
+            completed = True
         finally:
             self.item["_downloads"] -= 1
             self.room["last_activity"] = time.time()
             cleanup_room(self.room)
+            if completed:
+                from app.notifications import queue_download_alerts
+                queue_download_alerts(self.room, self.item)

@@ -1,4 +1,4 @@
-"""Brevo invitations and upload alerts use mocked provider calls only."""
+"""Brevo invitations and file activity alerts use mocked provider calls only."""
 import asyncio
 import unittest
 from unittest.mock import AsyncMock, patch
@@ -45,20 +45,32 @@ class NotificationTests(unittest.TestCase):
             self.assertEqual(guest.post(self.base + "/email-invitation", headers=self.headers,
                                         json={"email": "guest@example.com"}).status_code, 403)
 
-    def test_subscription_and_upload_alert_are_private(self):
+    def test_subscription_alerts_attach_uploaded_and_downloaded_file(self):
         response = self.client.post(self.base + "/subscriptions", headers=self.headers,
                                     json={"email": "guest@example.com", "enabled": True})
         self.assertEqual(response.status_code, 200)
         room = rooms.rooms[self.room]
-        item = {"kind": "file", "name": "private.txt", "expires_at": 10 ** 12}
-        with patch("app.notifications.send_email", new_callable=AsyncMock) as send:
-            async def queue():
-                notifications.queue_upload_alerts(room, item)
-                await asyncio.sleep(0)
-            asyncio.run(queue())
-            payload = send.call_args.args[0]
-        self.assertNotIn("private.txt", payload["textContent"])
-        self.assertNotIn("1234", payload["textContent"])
+        from pathlib import Path
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "private.txt"
+            path.write_bytes(b"private content")
+            item = {"kind": "file", "name": "private.txt", "path": path, "expires_at": 10 ** 12}
+            with patch("app.notifications.send_email", new_callable=AsyncMock) as send:
+                async def queue():
+                    notifications.queue_upload_alerts(room, item)
+                    await asyncio.sleep(0)
+                    notifications.queue_download_alerts(room, item)
+                    await asyncio.sleep(0)
+                asyncio.run(queue())
+                payloads = [call.args[0] for call in send.call_args_list]
+        self.assertEqual(len(payloads), 2)
+        self.assertEqual([payload["tags"] for payload in payloads], [["netdrop-file-upload"], ["netdrop-file-download"]])
+        for payload in payloads:
+            self.assertIn("private.txt", payload["textContent"])
+            self.assertEqual(payload["attachment"][0]["name"], "private.txt")
+            self.assertEqual(payload["attachment"][0]["content"], "cHJpdmF0ZSBjb250ZW50")
+            self.assertNotIn("1234", payload["textContent"])
         self.assertEqual(self.client.post(self.base + "/subscriptions", headers=self.headers,
                                           json={"email": "guest@example.com", "enabled": False}).status_code, 200)
 

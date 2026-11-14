@@ -40,7 +40,7 @@ synchronize data with one another.
 - Configurable file expiry and fixed room expiry
 - Owner controls for deleting content, removing members, and closing rooms
 - Copyable invitation links and locally generated QR codes
-- Optional opt-in upload alerts and expiring room invitations through Brevo's transactional email REST API
+- Optional opt-in alerts for every file upload and completed download, including the file as an email attachment, plus expiring room invitations through Brevo's transactional email REST API
 - Responsive monochrome interface for desktop and mobile browsers
 - Health endpoint for Render and external uptime monitoring
 
