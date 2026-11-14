@@ -15,7 +15,7 @@
 
 NetDrop is a lightweight, browser-based sharing application for classrooms,
 offices, laboratories, and small groups. A host creates a temporary room and
-participants join using a 12-character room ID and a 6–12 digit PIN. Everyone in
+participants join using a 12-character room ID and a four-digit PIN. Everyone in
 the room can share files, notes, and links while WebSockets keep the feed and
 member list synchronized.
 
@@ -37,10 +37,10 @@ synchronize data with one another.
 - Live room feed and member presence through WebSockets
 - Automatic reconnect and feed resynchronization
 - Multi-file upload queue with progress, cancel, and retry controls
-- Configurable content expiry and idle-room cleanup
+- Configurable file expiry and fixed room expiry
 - Owner controls for deleting content, removing members, and closing rooms
 - Copyable invitation links and locally generated QR codes
-- Optional room invitations through the Brevo transactional email REST API
+- Optional opt-in upload alerts and expiring room invitations through Brevo's transactional email REST API
 - Responsive monochrome interface for desktop and mobile browsers
 - Health endpoint for Render and external uptime monitoring
 
@@ -114,7 +114,7 @@ On Windows PowerShell, activate the environment with:
 ## Using NetDrop
 
 1. Select **Local Network** or **Online**.
-2. Choose **Create a room**, enter a name, and create a 6–12 digit PIN.
+2. Choose **Create a room**, enter a name, and create a four-digit PIN.
 3. Share the room ID and PIN, copy the invitation link, show the QR code, or send
    an email invitation.
 4. Participants open NetDrop, enter the room ID and PIN, and optionally choose a
@@ -134,10 +134,11 @@ file, and the server must be restarted after changes.
 | --- | --- | --- |
 | `NETDROP_HOST` | `0.0.0.0` | Address the server listens on |
 | `NETDROP_PORT` | `8000` | Local HTTP port |
-| `NETDROP_FILE_TTL_SECONDS` | `1800` | Lifetime of files, notes, and links |
-| `NETDROP_MAX_UPLOAD_MB` | `100` | Maximum size of each uploaded file |
+| `NETDROP_FILE_TTL_SECONDS` | `1800` | Lifetime of uploaded files |
+| `NETDROP_MAX_UPLOAD_BYTES` | `50000000` | Exact maximum size of each uploaded file |
 | `NETDROP_CLEANUP_INTERVAL_SECONDS` | `5` | Interval between cleanup scans |
-| `NETDROP_ROOM_IDLE_SECONDS` | `1800` | Idle time before an unused room is retired |
+| `NETDROP_ROOM_TTL_SECONDS` | `259200` | Maximum room lifetime: three days |
+| `NETDROP_INVITATION_TTL_SECONDS` | `86400` | Email invitation-token lifetime |
 | `NETDROP_SHARING_MODE` | `local` | This server's mode: `local` or `online` |
 | `NETDROP_LOCAL_URL` | empty | Reachable LAN origin used in local invitations |
 | `NETDROP_ONLINE_URL` | empty | Public HTTPS origin used in online invitations |
@@ -208,8 +209,9 @@ BREVO_SENDER_EMAIL=your-verified-sender@example.com
 BREVO_SENDER_NAME=NetDrop
 ```
 
-Only the room owner can send an invitation. The owner must confirm the room PIN,
-which is included in that email but is not persisted as plaintext by NetDrop.
+Only the room owner can send an invitation. Each email has a random, expiring
+server-validated token; it never includes the room PIN. Recipients still need the
+PIN separately to enter the room.
 Invitations are limited to one attempt every 30 seconds and 10 attempts per hour
 per browser session. Duplicate attempts to the same room and recipient are
 blocked for five minutes.
@@ -306,7 +308,7 @@ boundaries.
 | --- | --- |
 | Phone cannot open the local host | Use the computer's LAN IP, connect both devices to the same network, and check the firewall and router client isolation |
 | `127.0.0.1` fails on another device | That address points to the device itself; use the host computer's LAN IP |
-| Room ID or PIN is rejected | Use the 12-character room ID and the original 6–12 digit PIN; a restart invalidates old rooms |
+| Room ID or PIN is rejected | Use the 12-character room ID and the original four-digit PIN; a restart invalidates old rooms |
 | Live updates keep reconnecting | Check connectivity, keep the host running, and use **Refresh** as a fallback |
 | File disappeared | It expired, the owner deleted it, the room closed, or the server restarted |
 | Render deploy times out after startup | Set the Render health check path to `/up` |

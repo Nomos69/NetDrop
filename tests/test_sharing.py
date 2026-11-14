@@ -23,13 +23,13 @@ class SharingTests(unittest.TestCase):
         self.owner = self.enterContext(TestClient(app))
         self.guest = self.enterContext(TestClient(app))
         self.headers = {'X-NetDrop': '1'}
-        response = self.owner.post('/api/rooms', json={'name': 'Study group', 'pin': '123456'}, headers=self.headers)
+        response = self.owner.post('/api/rooms', json={'name': 'Study group', 'pin': '1234'}, headers=self.headers)
         self.assertEqual(response.status_code, 201)
         self.room = response.json()['id']
         self.base = f'/api/rooms/{self.room}'
 
     def join(self):
-        return self.guest.post(self.base + '/join', json={'pin': '123456'}, headers=self.headers)
+        return self.guest.post(self.base + '/join', json={'pin': '1234'}, headers=self.headers)
 
     def upload(self, content=b'hello', name='example.txt'):
         return self.owner.post(self.base + '/files', content=content,
@@ -37,7 +37,7 @@ class SharingTests(unittest.TestCase):
 
     def test_join_isolation_leave_and_pin(self):
         self.assertEqual(self.guest.get(self.base + '/items').status_code, 403)
-        wrong = self.guest.post(self.base + '/join', json={'pin': '654321'}, headers=self.headers)
+        wrong = self.guest.post(self.base + '/join', json={'pin': '5678'}, headers=self.headers)
         self.assertEqual(wrong.status_code, 403)
         self.assertEqual(self.join().status_code, 200)
         self.assertEqual(self.guest.get(self.base + '/items').status_code, 200)
@@ -46,7 +46,7 @@ class SharingTests(unittest.TestCase):
 
     def test_pin_attempt_limit(self):
         for _ in range(5):
-            self.assertEqual(self.guest.post(self.base + '/join', json={'pin': '000000'}, headers=self.headers).status_code, 403)
+            self.assertEqual(self.guest.post(self.base + '/join', json={'pin': '0000'}, headers=self.headers).status_code, 403)
         self.assertEqual(self.join().status_code, 429)
 
     def test_download_is_room_scoped(self):
@@ -58,7 +58,7 @@ class SharingTests(unittest.TestCase):
         self.assertEqual(self.guest.get(url).status_code, 403)
         self.join()
         self.assertEqual(self.guest.get(url).content, b'hello')
-        other = self.guest.post('/api/rooms', json={'name': 'Other', 'pin': '999999'}, headers=self.headers).json()['id']
+        other = self.guest.post('/api/rooms', json={'name': 'Other', 'pin': '9999'}, headers=self.headers).json()['id']
         self.assertEqual(self.guest.get(f'/api/rooms/{other}/files/{item["id"]}').status_code, 404)
         self.assertEqual(self.owner.get(url).headers['content-type'], 'application/octet-stream')
 
@@ -96,6 +96,16 @@ class SharingTests(unittest.TestCase):
             self.assertEqual(result.status_code, code)
         self.join()
         self.assertEqual(len(self.guest.get(self.base + '/items').json()['items']), 2)
+
+    def test_text_remains_until_room_expiry(self):
+        self.assertEqual(self.owner.post(self.base + '/items', headers=self.headers,
+                                         json={'kind': 'text', 'content': 'Keep this'}).status_code, 201)
+        item = next(iter(rooms.rooms[self.room]['items'].values()))
+        self.assertNotIn('expires_at', item)
+
+    def test_room_deadline_rejects_access(self):
+        rooms.rooms[self.room]['expires_at'] = 0
+        self.assertEqual(self.owner.get(self.base + '/items').status_code, 404)
 
     def test_expired_session(self):
         for session in rooms.sessions.values():

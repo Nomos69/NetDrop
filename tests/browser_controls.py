@@ -16,7 +16,7 @@ def main():
     with tempfile.TemporaryDirectory() as storage:
         code = "from pathlib import Path; from app import config; import os; config.UPLOAD_DIR=Path(os.environ['NETDROP_TEST_STORAGE']); from app.main import app; import uvicorn; uvicorn.run(app,host='127.0.0.1',port=18768)"
         env = {**os.environ, 'NETDROP_TEST_STORAGE': storage, 'NETDROP_FILE_TTL_SECONDS': '120',
-               'NETDROP_CLEANUP_INTERVAL_SECONDS': '1', 'NETDROP_MAX_UPLOAD_MB': '1',
+               'NETDROP_CLEANUP_INTERVAL_SECONDS': '1', 'NETDROP_MAX_UPLOAD_BYTES': '1048576',
                'NETDROP_SHARING_MODE': 'local', 'NETDROP_LOCAL_URL': '', 'NETDROP_ONLINE_URL': ''}
         process = subprocess.Popen([sys.executable, '-c', code], env=env,
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -44,20 +44,20 @@ def main():
                 a.locator('#action-create').click()
                 a.locator('#create-display-name').fill('Owner')
                 a.locator('#room-name').fill('Sharing improvements')
-                a.locator('#create-pin').fill('123456')
+                a.locator('#create-pin').fill('1234')
                 a.get_by_role('button', name='Create room', exact=True).click()
                 expect(a.locator('#close-room')).to_be_visible()
                 room_id = a.locator('#active-id').inner_text()
                 b.locator('#room-id').fill(room_id)
                 b.locator('#join-display-name').fill('Guest')
-                b.locator('#join-pin').fill('123456')
+                b.locator('#join-pin').fill('1234')
                 b.get_by_role('button', name='Join room', exact=True).click()
                 expect(b.locator('#live-status')).to_have_text('Live updates connected')
                 expect(b.locator('#close-room')).to_be_hidden()
                 a.locator('#qr-invite summary').click()
                 expect(a.locator('#invite-qr')).to_be_visible()
                 assert a.locator('#invite-qr').evaluate('(img) => img.complete && img.naturalWidth > 0')
-                assert '123456' not in a.locator('#invite-link').input_value()
+                assert '1234' not in a.locator('#invite-link').input_value()
                 # A failed file must not prevent the following file from succeeding.
                 calls = []
                 def fail_first(route):
@@ -114,7 +114,7 @@ def main():
                 expect(a.locator('#member-count')).to_have_text('1 joined · 1 online')
                 # Rejoining is explicitly allowed for anyone retaining the PIN.
                 b.locator('#room-id').fill(room_id)
-                b.locator('#join-pin').fill('123456')
+                b.locator('#join-pin').fill('1234')
                 b.get_by_role('button', name='Join room', exact=True).click()
                 expect(b.locator('#room')).to_be_visible()
                 a.locator('#close-room').click()

@@ -1,4 +1,4 @@
-"""Owner-requested invitations using Brevo's transactional HTTPS API."""
+"""Optional Brevo email invitations and upload alerts; delivery never blocks LAN sharing."""
 
 import asyncio
 import hashlib
@@ -20,34 +20,47 @@ ENDPOINT = "https://api.brevo.com/v3/smtp/email"
 
 class Invitation(BaseModel):
     email: str = Field(max_length=254, pattern=r"^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$")
-    pin: str = Field(pattern=r"^[0-9]{6,12}$")
+
+
+class Subscription(BaseModel):
+    email: str = Field(max_length=254, pattern=r"^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$")
+    enabled: bool = True
+
+
+class InvitationToken(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
 
 
 def enabled():
     return bool(config.BREVO_API_KEY and config.BREVO_SENDER_EMAIL)
 
 
+def origin_for(request):
+    return config.ONLINE_URL if config.sharing_mode(request) == "online" else config.LOCAL_URL
+
+
+def fingerprint(email):
+    return hashlib.sha256(email.lower().encode()).hexdigest()
+
+
 async def send_email(payload, event_id):
-    """Retry explicit rejection only; a timeout may already have sent the email."""
+    """Return provider acceptance. A timeout is deliberately not retried."""
     async with httpx.AsyncClient(timeout=5.0) as client:
         for attempt in range(1, 4):
             try:
-                response = await client.post(ENDPOINT, headers={
-                    "api-key": config.BREVO_API_KEY, "accept": "application/json",
-                }, json=payload)
+                response = await client.post(ENDPOINT, headers={"api-key": config.BREVO_API_KEY,
+                                                                 "accept": "application/json"}, json=payload)
             except httpx.RequestError:
                 logger.warning("email event=%s attempt=%s state=unknown", event_id, attempt)
-                raise HTTPException(502, "Email delivery could not be confirmed. Check the recipient inbox before trying again.")
+                return False
             if response.status_code == 201:
                 try:
-                    message_id = response.json().get("messageId")
+                    accepted = isinstance(response.json().get("messageId"), str)
                 except (ValueError, AttributeError):
-                    message_id = None
-                if not isinstance(message_id, str) or not message_id:
-                    raise HTTPException(502, "Email acceptance could not be confirmed. Check the recipient inbox before trying again.")
-                logger.info("email event=%s attempt=%s state=accepted", event_id, attempt)
-                return {"status": "accepted", "message": "Invitation sent. Ask the recipient to check their inbox or spam folder."}
-            logger.warning("email event=%s attempt=%s state=rejected http=%s", event_id, attempt, response.status_code)
+                    accepted = False
+                logger.info("email event=%s attempt=%s state=%s", event_id, attempt,
+                            "accepted" if accepted else "invalid-response")
+                return accepted
             if response.status_code == 429 and attempt < 3:
                 try:
                     delay = max(1, int(response.headers.get("retry-after", "1")))
@@ -56,15 +69,51 @@ async def send_email(payload, event_id):
                 if delay <= 2:
                     await asyncio.sleep(delay)
                     continue
-            # Avoid retrying server errors: they can have an ambiguous send result.
-            raise HTTPException(503, "Email service is unavailable or rejected the invitation. File sharing still works; ask the host to check Brevo settings and quota.")
+            logger.warning("email event=%s attempt=%s state=rejected http=%s", event_id, attempt, response.status_code)
+            return False
+    return False
+
+
+def queue_upload_alerts(room, item):
+    """Fire-and-forget after local commit; failure never changes upload success."""
+    if not enabled() or not room.get("subscriptions"):
+        return
+    for subscription in room["subscriptions"].values():
+        if subscription["enabled"]:
+            asyncio.create_task(send_upload_alert(room, item, subscription["email"]))
+
+
+async def send_upload_alert(room, item, email):
+    if room.get("closed") or item.get("expires_at", float("inf")) <= time.time():
+        return
+    text = (f'A new file is available in NetDrop room: {room["name"]}.\n'
+            'Open NetDrop and enter the room details you received separately. '
+            'This alert contains no room PIN, file name, or file contents.')
+    payload = {"sender": {"email": config.BREVO_SENDER_EMAIL, "name": config.BREVO_SENDER_NAME},
+               "to": [{"email": email}], "subject": "New NetDrop upload available",
+               "textContent": text, "htmlContent": "<html><body><pre>" + escape(text) + "</pre></body></html>",
+               "tags": ["netdrop-upload-alert"]}
+    await send_email(payload, secrets.token_hex(12))
+
+
+@router.post("/rooms/{room_id}/subscriptions", dependencies=[Depends(rooms.browser_write)])
+async def subscription(body: Subscription, room=Depends(rooms.authorize)):
+    subscriptions = room.setdefault("subscriptions", {})
+    key = fingerprint(body.email)
+    if body.enabled:
+        subscriptions[key] = {"email": body.email.lower(), "enabled": True}
+        return {"enabled": True, "message": "Upload alerts enabled for this email address."}
+    subscriptions.pop(key, None)
+    return {"enabled": False, "message": "Upload alerts disabled for this email address."}
 
 
 @router.post("/rooms/{room_id}/email-invitation", dependencies=[Depends(rooms.browser_write)])
 async def email_invitation(body: Invitation, request: Request, room=Depends(rooms.owner_only)):
     if not enabled():
         raise HTTPException(503, "Email is not configured. The host must set the Brevo API key and verified sender.")
-    # Limit across all rooms owned by this browser session, including bad PINs.
+    origin = origin_for(request)
+    if not origin:
+        raise HTTPException(503, "The host must configure the public HTTPS or LAN address before emailing invitations.")
     session = rooms.session_for(request)
     now = time.monotonic()
     history = [stamp for stamp in session.get("email_attempts", []) if now - stamp < 3600]
@@ -72,31 +121,34 @@ async def email_invitation(body: Invitation, request: Request, room=Depends(room
     if len(history) >= 10 or (history and now - history[-1] < 30):
         raise HTTPException(429, "Please wait before sending another invitation (30 seconds between sends, 10 per hour).")
     history.append(now)
-    if not secrets.compare_digest(rooms.pin_hash(body.pin, room["salt"]), room["pin_hash"]):
-        raise HTTPException(403, "The room PIN is incorrect.")
-    mode = config.sharing_mode(request)
-    origin = config.ONLINE_URL if mode == "online" else config.LOCAL_URL
-    if not origin:
-        raise HTTPException(503, "The host must configure the public HTTPS or LAN address before emailing invitations.")
-    # Hash the destination for short-lived duplicate suppression; never log addresses/PINs.
-    fingerprint = hashlib.sha256(body.email.lower().encode()).hexdigest()
     sent = room.setdefault("email_invitations", {})
-    for key in list(sent):
-        if now - sent[key] >= 300:
-            del sent[key]
-    if fingerprint in sent:
+    key = fingerprint(body.email)
+    if key in sent and now - sent[key]["created"] < 300:
         raise HTTPException(409, "An invitation was already attempted for this address. Check the inbox or wait five minutes.")
-    sent[fingerprint] = now
-    link = origin + "/#room=" + room["id"]
-    network = "Join from the same Wi-Fi or LAN as the host." if mode == "local" else "Internet access is required."
-    text = (f'You are invited to NetDrop room: {room["name"]}\n'
-            f'Room ID: {room["id"]}\nPIN: {body.pin}\nJoin: {link}\n\n'
-            f'{network}\nThe room is temporary and may close when the host restarts. '
-            'Keep this invitation private. If you were not expecting it, ignore this email.')
-    event_id = secrets.token_hex(12)
-    return await send_email({
-        "sender": {"email": config.BREVO_SENDER_EMAIL, "name": config.BREVO_SENDER_NAME},
-        "to": [{"email": body.email}], "subject": "Your NetDrop room invitation",
-        "textContent": text, "htmlContent": "<html><body><pre>" + escape(text) + "</pre></body></html>",
-        "tags": ["netdrop-invitation"],
-    }, event_id)
+    token = secrets.token_urlsafe(24)
+    sent[key] = {"created": now, "token_hash": hashlib.sha256(token.encode()).hexdigest(),
+                 "expires_at": time.time() + config.INVITATION_TTL_SECONDS}
+    link = f"{origin}/#room={room['id']}&invite={token}"
+    text = (f'You are invited to NetDrop room: {room["name"]}\nJoin: {link}\n\n'
+            'This invitation expires. It does not grant room access: ask the owner for the PIN separately. '
+            'For a local room, join the same Wi-Fi or LAN as the host.')
+    accepted = await send_email({"sender": {"email": config.BREVO_SENDER_EMAIL, "name": config.BREVO_SENDER_NAME},
+                                 "to": [{"email": body.email}], "subject": "Your NetDrop room invitation",
+                                 "textContent": text, "htmlContent": "<html><body><pre>" + escape(text) + "</pre></body></html>",
+                                 "tags": ["netdrop-invitation"]}, secrets.token_hex(12))
+    if not accepted:
+        sent.pop(key, None)
+        raise HTTPException(503, "Email service did not accept the invitation. File sharing still works.")
+    return {"status": "accepted", "message": "Invitation sent. Ask the recipient to check their inbox or spam folder."}
+
+
+@router.post("/rooms/{room_id}/validate-invitation", dependencies=[Depends(rooms.browser_write)])
+async def validate_invitation(room_id: str, body: InvitationToken):
+    room = rooms.rooms.get(room_id)
+    if not room or room.get("closed") or room["expires_at"] <= time.time():
+        raise HTTPException(404, "This room is no longer available.")
+    candidate = hashlib.sha256(body.token.encode()).hexdigest()
+    for record in room.get("email_invitations", {}).values():
+        if record["expires_at"] > time.time() and secrets.compare_digest(record["token_hash"], candidate):
+            return {"valid": True}
+    raise HTTPException(403, "This invitation is invalid or has expired.")

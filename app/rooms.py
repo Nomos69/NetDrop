@@ -20,12 +20,12 @@ SESSION_SECONDS = 12 * 60 * 60
 
 class RoomInput(BaseModel):
     name: str = Field(min_length=1, max_length=60)
-    pin: str = Field(pattern=r"^[0-9]{6,12}$")
+    pin: str = Field(pattern=r"^[0-9]{4}$")
     display_name: str = Field(default="", max_length=40)
 
 
 class JoinInput(BaseModel):
-    pin: str = Field(pattern=r"^[0-9]{6,12}$")
+    pin: str = Field(pattern=r"^[0-9]{4}$")
     display_name: str = Field(default="", max_length=40)
 
 
@@ -52,7 +52,10 @@ async def authorize(room_id: str, request: Request):
     if not session or room_id not in session["rooms"]:
         raise HTTPException(403, "Join this room first.")
     room = rooms.get(room_id)
-    if room is None or room.get("closed"):
+    if room is None or room.get("closed") or room["expires_at"] <= time.time():
+        if room is not None and room["expires_at"] <= time.time():
+            from app.files import retire_room
+            retire_room(room)
         raise HTTPException(404, "Room no longer exists.")
     room["last_activity"] = time.time()
     return room
@@ -82,7 +85,8 @@ def grant(room_id, request, response, display_name=""):
 
 def public_room(room, request, session=None):
     return {"id": room["id"], "name": room["name"], "mode": config.sharing_mode(request),
-            "is_owner": (session or session_for(request))["member_id"] == room.get("owner_id")}
+            "is_owner": (session or session_for(request))["member_id"] == room.get("owner_id"),
+            "expires_at": room["expires_at"]}
 
 
 @router.post("/rooms", status_code=201, dependencies=[Depends(browser_write)])
@@ -93,11 +97,13 @@ async def create_room(body: RoomInput, request: Request, response: Response):
     from app.files import cleanup_once
     cleanup_once()
     if len(rooms) >= 100:
-        raise HTTPException(503, "Room limit reached. Close an unused room or wait for idle-room cleanup.")
+        raise HTTPException(503, "Room limit reached. Close an unused room or wait for room expiry.")
     room_id = secrets.token_hex(6)
     salt = secrets.token_bytes(16)
-    room = {"id": room_id, "name": name, "salt": salt,
-            "pin_hash": pin_hash(body.pin, salt), "items": {}, "last_activity": time.time()}
+    created_at = time.time()
+    room = {"id": room_id, "name": name, "salt": salt, "created_at": created_at,
+            "expires_at": created_at + config.ROOM_TTL_SECONDS,
+            "pin_hash": pin_hash(body.pin, salt), "items": {}, "last_activity": created_at}
     session = grant(room_id, request, response, body.display_name)
     room["owner_id"] = session["member_id"]
     rooms[room_id] = room
@@ -120,7 +126,7 @@ async def join_room(room_id: str, body: JoinInput, request: Request, response: R
         raise HTTPException(429, "Too many join attempts. Try again in a minute.", headers={"Retry-After": "60"})
     attempt["count"] += 1
     room = rooms.get(room_id)
-    if room is None or room.get("closed") or not secrets.compare_digest(pin_hash(body.pin, room["salt"]), room["pin_hash"]):
+    if room is None or room.get("closed") or room["expires_at"] <= time.time() or not secrets.compare_digest(pin_hash(body.pin, room["salt"]), room["pin_hash"]):
         raise HTTPException(403, "Room ID or PIN is incorrect.")
     session = grant(room_id, request, response, body.display_name)
     room["last_activity"] = time.time()

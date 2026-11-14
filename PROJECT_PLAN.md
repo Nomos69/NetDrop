@@ -1,6 +1,6 @@
 # NetDrop project plan
 
-Status: steps 1–8 of the implementation procedure are implemented, including live updates, reconnect resync, expiry, and cleanup. Step 9 core LAN access/sharing is confirmed by the user on a phone. Step 11 verification and documentation cover the current LAN prototype; remaining real-device observations are listed in docs/verification.md. Brevo REST API room invitations are implemented. Step 10 automatic new-file alerts remain unimplemented.
+Status: steps 1–8 of the implementation procedure are implemented, including live updates, reconnect resync, expiry, and cleanup. Step 9 core LAN access/sharing is confirmed by the user on a phone. Step 11 verification and documentation cover the current LAN prototype; remaining real-device observations are listed in docs/verification.md. Brevo REST API invitations and opt-in new-file alerts are implemented in memory; real-provider delivery still needs evidence.
 
 ## Basis and scope
 
@@ -117,12 +117,11 @@ verification remains separate from the local two-server browser checks.
 
 ## Sharing improvements — 2026-10-29
 
-Implemented automatic idle-room cleanup, creator-owned close/remove/delete
-controls, sequential multiple-file uploads with progress/cancel/retry, live expiry
-countdowns, and private QR invitations generated on the server. Room ownership
-belongs to the creating browser session; member removal permits rejoining with the
-PIN. Existing downloads retain their deletion leases. Idle time defaults to 30
-minutes and is configurable with `NETDROP_ROOM_IDLE_SECONDS`.
+Implemented creator-owned close/remove/delete controls, sequential multiple-file
+uploads with progress/cancel/retry, live expiry countdowns, and private QR
+invitations generated on the server. Rooms have a fixed three-day deadline;
+member removal permits rejoining with the PIN. Existing downloads retain their
+deletion leases.
 
 Brevo API invitations are implemented; automatic new-file notifications remain deferred. Physical-device and public cross-network
 verification still require the device checklist in `docs/verification.md`.

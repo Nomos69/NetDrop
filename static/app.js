@@ -136,7 +136,7 @@ $('email-invitation').addEventListener('submit', async (event) => {
   $('email-result').textContent = 'Sending invitation…';
   try {
     const result = await api(`/rooms/${activeRoom.id}/email-invitation`, {
-      ...json({ email: $('invite-email').value.trim(), pin: $('invite-pin').value }),
+      ...json({ email: $('invite-email').value.trim() }),
       signal: AbortSignal.timeout(25000),
     });
     $('email-result').textContent = result.message;
@@ -144,9 +144,24 @@ $('email-invitation').addEventListener('submit', async (event) => {
     $('email-result').textContent = error.name === 'TimeoutError'
       ? 'Email acceptance is unknown. Check the inbox before trying again.' : error.message;
   } finally {
-    $('invite-pin').value = '';
     button.disabled = false;
   }
+});
+
+$('upload-alerts').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!activeRoom) return;
+  try {
+    const result = await api(`/rooms/${activeRoom.id}/subscriptions`, json({ email: $('alert-email').value.trim(), enabled: true }));
+    $('alert-result').textContent = result.message;
+  } catch (error) { $('alert-result').textContent = error.message; }
+});
+$('disable-alerts').addEventListener('click', async () => {
+  if (!activeRoom || !$('alert-email').value.trim()) return;
+  try {
+    const result = await api(`/rooms/${activeRoom.id}/subscriptions`, json({ email: $('alert-email').value.trim(), enabled: false }));
+    $('alert-result').textContent = result.message;
+  } catch (error) { $('alert-result').textContent = error.message; }
 });
 
 function stopLive() {
@@ -264,6 +279,7 @@ function showRoom(room) {
   if (room) {
     $('active-name').textContent = room.name;
     $('active-id').textContent = room.id;
+    $('room-mode').dataset.expires = room.expires_at;
     showInvitation(room);
     $('sharing-options').hidden = true;
     sessionStorage.setItem('netdrop-room', room.id);
@@ -286,7 +302,7 @@ async function refresh() {
   const [data] = await Promise.all([api(`/rooms/${room.id}/items`), refreshMembers(room)]);
   if (activeRoom !== room || number !== refreshNumber) return;
   maxUploadBytes = data.max_upload_bytes;
-  $('upload-limit').textContent = `Maximum file size: ${maxUploadBytes / 1024 / 1024} MiB. Shared items expire after ${data.ttl_seconds / 60} minutes.`;
+  $('upload-limit').textContent = `Maximum file size: ${maxUploadBytes.toLocaleString()} bytes. Files expire after ${data.ttl_seconds / 60} minutes; notes and links remain until the room closes.`;
   $('items').replaceChildren();
   if (!data.items.length) {
     const item = document.createElement('li');
@@ -306,10 +322,13 @@ async function refresh() {
       label.rel = 'noopener noreferrer';
     }
     const details = document.createElement('small');
-    details.textContent = `${item.kind}${item.kind === 'file' ? ` · ${item.size.toLocaleString()} bytes` : ''} · ${new Date(item.created_at).toLocaleString()} · Expires ${new Date(item.expires_at * 1000).toLocaleTimeString()}`;
-    const countdown = document.createElement('small');
-    countdown.dataset.expires = item.expires_at;
-    row.append(label, details, countdown);
+    details.textContent = `${item.kind}${item.kind === 'file' ? ` · ${item.size.toLocaleString()} bytes` : ''} · ${new Date(item.created_at).toLocaleString()}${item.kind === 'file' ? ` · Expires ${new Date(item.expires_at * 1000).toLocaleTimeString()}` : ' · Available while the room is open'}`;
+    row.append(label, details);
+    if (item.kind === 'file') {
+      const countdown = document.createElement('small');
+      countdown.dataset.expires = item.expires_at;
+      row.append(countdown);
+    }
     if (room.is_owner) {
       const remove = document.createElement('button');
       remove.className = 'secondary';
@@ -375,7 +394,7 @@ async function refreshMembers(room) {
 function validateRoomForm(action) {
   const pin = $(`${action}-pin`);
   pin.value = pin.value.trim();
-  pin.setCustomValidity(/^[0-9]{6,12}$/.test(pin.value) ? '' : 'Enter a PIN containing 6 to 12 digits (0–9).');
+  pin.setCustomValidity(/^[0-9]{4}$/.test(pin.value) ? '' : 'Enter a four-digit PIN (0–9).');
   if (action === 'join') {
     const id = $('room-id');
     id.value = id.value.replace(/\s/g, '').toLowerCase();
@@ -389,7 +408,7 @@ function validateRoomForm(action) {
 // validation, paste, autofill and keyboard editing behavior.
 function renderPin(input) {
   const cells = input.nextElementSibling;
-  const count = Math.max(6, input.value.length);
+  const count = 4;
   cells.style.setProperty('--pin-slots', count);
   cells.replaceChildren();
   for (let index = 0; index < count; index += 1) {
@@ -410,7 +429,7 @@ for (const input of document.querySelectorAll('.pin-entry')) {
       return;
     }
     const bounds = input.getBoundingClientRect();
-    const count = Math.max(6, input.value.length);
+    const count = 4;
     const position = Math.max(0, Math.min(input.value.length,
       Math.round((event.clientX - bounds.left) / bounds.width * count)));
     input.setSelectionRange(position, position);
@@ -461,6 +480,10 @@ function updateCountdowns() {
   for (const label of document.querySelectorAll('[data-expires]')) {
     const seconds = Math.max(0, Math.ceil(Number(label.dataset.expires) - Date.now() / 1000));
     label.textContent = seconds ? `Expires in ${Math.floor(seconds / 60)}m ${seconds % 60}s` : 'Expired · awaiting cleanup';
+  }
+  if (activeRoom?.expires_at) {
+    const seconds = Math.max(0, Math.ceil(Number(activeRoom.expires_at) - Date.now() / 1000));
+    $('room-mode').textContent = `${activeRoom.mode === 'online' ? 'Online room' : 'Local room'} · Room expires in ${Math.floor(seconds / 86400)}d ${Math.floor(seconds % 86400 / 3600)}h`;
   }
 }
 setInterval(updateCountdowns, 1000);
@@ -589,8 +612,14 @@ $('leave').addEventListener('click', (event) => perform(event.currentTarget, asy
 updateMode();
 (async () => {
   await loadSharingSettings();
-  const invitation = new URLSearchParams(location.hash.slice(1)).get('room');
+  const parameters = new URLSearchParams(location.hash.slice(1));
+  const invitation = parameters.get('room');
+  const invitationToken = parameters.get('invite');
   if (invitation && /^[a-f0-9]{12}$/.test(invitation)) {
+    if (invitationToken) {
+      try { await api(`/rooms/${invitation}/validate-invitation`, json({ token: invitationToken })); }
+      catch (error) { status(error.message, true); return; }
+    }
     setRoomAction('join');
     $('room-id').value = invitation;
     history.replaceState(null, '', location.pathname + location.search);

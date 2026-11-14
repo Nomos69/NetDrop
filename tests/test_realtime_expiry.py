@@ -25,7 +25,7 @@ class LiveExpiryTests(unittest.TestCase):
         self.enterContext(patch.object(config, 'UPLOAD_DIR', Path(self.storage)))
         self.client = self.enterContext(TestClient(app))
         self.headers = {'X-NetDrop': '1'}
-        self.room_id = self.client.post('/api/rooms', json={'name': 'Live room', 'pin': '123456'}, headers=self.headers).json()['id']
+        self.room_id = self.client.post('/api/rooms', json={'name': 'Live room', 'pin': '1234'}, headers=self.headers).json()['id']
         self.base = f'/api/rooms/{self.room_id}'
         self.ws_headers = {'origin': 'http://testserver'}
 
@@ -81,19 +81,20 @@ class LiveExpiryTests(unittest.TestCase):
                 self.assertEqual(self.client.get(self.base + '/items').json()['items'], [])
             self.assertFalse((Path(self.storage) / item['id']).exists())
 
-    def test_text_and_link_expire(self):
+    def test_text_and_link_remain_while_room_is_open(self):
         with patch.object(files, 'now', return_value=1000):
             for kind, content in [('text', 'Note'), ('link', 'https://example.com')]:
                 self.client.post(self.base + '/items', json={'kind':kind, 'content':content}, headers=self.headers)
         with patch.object(files, 'now', return_value=1000 + config.FILE_TTL_SECONDS):
-            self.assertEqual(self.client.get(self.base + '/items').json()['items'], [])
+            self.assertEqual(len(self.client.get(self.base + '/items').json()['items']), 2)
 
     def test_background_cleanup_without_requests(self):
         with patch.object(config, 'FILE_TTL_SECONDS', 1), patch.object(config, 'CLEANUP_INTERVAL_SECONDS', 1):
             # A separate task uses the short interval immediately, independently of GET requests.
             async def check():
-                item = files.new_item('text')
-                item.update(content='Temporary', expires_at=files.now() + 0.05)
+                item = files.new_item('file')
+                item.update(name='Temporary', path=Path(self.storage) / 'temporary', expires_at=files.now() + 0.05)
+                item['path'].write_bytes(b'x')
                 room = rooms.rooms[self.room_id]
                 room['items'][item['id']] = item
                 task = asyncio.create_task(files.cleanup_loop())

@@ -31,9 +31,10 @@ if PORT > 65535:
 STATIC_DIR = BASE_DIR / "static"
 UPLOAD_DIR = BASE_DIR / "data" / "uploads"
 FILE_TTL_SECONDS = positive_integer("NETDROP_FILE_TTL_SECONDS", 1800)
-MAX_UPLOAD_BYTES = positive_integer("NETDROP_MAX_UPLOAD_MB", 100) * 1024 * 1024
+MAX_UPLOAD_BYTES = positive_integer("NETDROP_MAX_UPLOAD_BYTES", 50_000_000)
 
-ROOM_IDLE_SECONDS = positive_integer("NETDROP_ROOM_IDLE_SECONDS", 1800)
+ROOM_TTL_SECONDS = positive_integer("NETDROP_ROOM_TTL_SECONDS", 3 * 24 * 60 * 60)
+INVITATION_TTL_SECONDS = positive_integer("NETDROP_INVITATION_TTL_SECONDS", 24 * 60 * 60)
 
 # Brevo HTTPS API credentials stay on the server; SMTP keys do not work here.
 BREVO_API_KEY = os.getenv("BREVO_API_KEY", "").strip()

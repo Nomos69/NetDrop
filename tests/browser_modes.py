@@ -65,19 +65,19 @@ with tempfile.TemporaryDirectory() as directory:
                 a.screenshot(path=f'/tmp/netdrop-{mode}-lobby.png', full_page=True)
                 a.locator('#action-create').click()
                 a.locator('#room-name').fill(f'{mode} room')
-                a.locator('#create-pin').fill('123456')
+                a.locator('#create-pin').fill('1234')
                 a.get_by_role('button', name='Create room', exact=True).click()
                 expect(a.locator('#live-status')).to_have_text('Live updates connected')
                 invitation = a.locator('#invite-link').input_value()
                 assert invitation.startswith(origin + '/#room=')
-                assert '123456' not in invitation
+                assert '1234' not in invitation
                 a.evaluate("Object.defineProperty(navigator, 'clipboard', {value: undefined, configurable: true})")
                 a.locator('#copy-invite').click()
                 expect(a.locator('#status')).to_have_text('Select and copy the invitation link above.')
                 b.goto(invitation)
                 expect(b.locator('#room-id')).to_have_value(a.locator('#active-id').inner_text())
                 expect(b.locator('#room')).to_be_hidden()
-                b.locator('#join-pin').fill('123456')
+                b.locator('#join-pin').fill('1234')
                 b.get_by_role('button', name='Join room', exact=True).click()
                 expect(b.locator('#live-status')).to_have_text('Live updates connected')
                 a.locator('#file').set_input_files({'name': f'{mode}.txt',

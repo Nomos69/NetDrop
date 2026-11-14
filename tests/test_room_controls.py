@@ -25,12 +25,12 @@ class RoomControlTests(unittest.TestCase):
         self.owner = self.enterContext(TestClient(app))
         self.guest = self.enterContext(TestClient(app))
         self.headers = {'X-NetDrop': '1'}
-        result = self.owner.post('/api/rooms', json={'name': 'Controls', 'pin': '123456'}, headers=self.headers)
+        result = self.owner.post('/api/rooms', json={'name': 'Controls', 'pin': '1234'}, headers=self.headers)
         self.assertTrue(result.json()['is_owner'])
         self.room_id = result.json()['id']
         self.base = '/api/rooms/' + self.room_id
         self.room = rooms.rooms[self.room_id]
-        self.assertFalse(self.guest.post(self.base + '/join', json={'pin': '123456'}, headers=self.headers).json()['is_owner'])
+        self.assertFalse(self.guest.post(self.base + '/join', json={'pin': '1234'}, headers=self.headers).json()['is_owner'])
 
     def upload(self):
         return self.owner.post(self.base + '/files', content=b'hello', headers={**self.headers, 'X-Filename': 'a.txt'}).json()
@@ -52,14 +52,14 @@ class RoomControlTests(unittest.TestCase):
     def test_owner_can_leave_and_rejoin_but_pin_does_not_transfer_ownership(self):
         self.owner.post(self.base + '/leave', headers=self.headers)
         self.assertEqual(self.owner.get(self.base).status_code, 403)
-        result = self.owner.post(self.base + '/join', json={'pin': '123456'}, headers=self.headers)
+        result = self.owner.post(self.base + '/join', json={'pin': '1234'}, headers=self.headers)
         self.assertTrue(result.json()['is_owner'])
         self.assertTrue(self.owner.get(self.base).json()['is_owner'])
         self.assertFalse(self.guest.get(self.base).json()['is_owner'])
         self.assertEqual(self.guest.delete(self.base, headers=self.headers).status_code, 403)
 
     def test_removal_revokes_live_socket_and_is_room_scoped(self):
-        other = self.guest.post('/api/rooms', json={'name': 'Other', 'pin': '654321'}, headers=self.headers).json()['id']
+        other = self.guest.post('/api/rooms', json={'name': 'Other', 'pin': '5678'}, headers=self.headers).json()['id']
         member = rooms.sessions[self.guest.cookies.get(rooms.COOKIE)]['member_id']
         with self.guest.websocket_connect(self.base + '/live', headers={'origin': 'http://testserver'}) as ws:
             ws.receive_json()
@@ -68,7 +68,7 @@ class RoomControlTests(unittest.TestCase):
                 ws.receive_json()
         self.assertEqual(self.guest.get('/api/rooms/' + other).status_code, 200)
         # Removal is not a permanent ban: a valid PIN can grant access again.
-        self.assertEqual(self.guest.post(self.base + '/join', json={'pin': '123456'}, headers=self.headers).status_code, 200)
+        self.assertEqual(self.guest.post(self.base + '/join', json={'pin': '1234'}, headers=self.headers).status_code, 200)
 
     def test_delete_and_close_respect_active_download_lease(self):
         item = self.upload()
@@ -79,24 +79,17 @@ class RoomControlTests(unittest.TestCase):
         self.assertEqual(self.guest.get(self.base + '/files/' + item['id']).status_code, 410)
         self.owner.delete(self.base, headers=self.headers)
         self.assertIn(self.room_id, rooms.rooms)
-        self.assertEqual(self.guest.post(self.base + '/join', json={'pin': '123456'}, headers=self.headers).status_code, 403)
+        self.assertEqual(self.guest.post(self.base + '/join', json={'pin': '1234'}, headers=self.headers).status_code, 403)
         stored['_downloads'] = 0
         files.cleanup_once()
         self.assertFalse(stored['path'].exists())
         self.assertNotIn(self.room_id, rooms.rooms)
 
-    def test_idle_cleanup_keeps_live_rooms_and_transfers(self):
-        self.room['last_activity'] = time.time() - config.ROOM_IDLE_SECONDS - 1
-        self.room['_uploads'] = 1
+    def test_room_cleanup_waits_for_fixed_deadline(self):
+        self.room['expires_at'] = time.time() + 1
         files.cleanup_once()
         self.assertIn(self.room_id, rooms.rooms)
-        self.room['_uploads'] = 0
-        with self.owner.websocket_connect(self.base + '/live', headers={'origin': 'http://testserver'}) as ws:
-            ws.receive_json()
-            files.cleanup_once()
-            self.assertIn(self.room_id, rooms.rooms)
-        self.assertGreater(self.room["last_activity"], time.time() - 5)
-        self.room["last_activity"] = time.time() - config.ROOM_IDLE_SECONDS - 1
+        self.room['expires_at'] = 0
         files.cleanup_once()
         self.assertNotIn(self.room_id, rooms.rooms)
         self.assertNotIn(self.room_id, rooms.sessions[self.owner.cookies.get(rooms.COOKIE)]['rooms'])
@@ -126,6 +119,6 @@ class RoomControlTests(unittest.TestCase):
             self.assertIn('image/svg+xml', response.headers['content-type'])
             self.assertIn(b'<svg', response.content)
             self.assertEqual(make.call_args.args[0], 'http://192.168.1.5:8000/#room=' + self.room_id)
-            self.assertNotIn('123456', make.call_args.args[0])
+            self.assertNotIn('1234', make.call_args.args[0])
         with TestClient(app) as stranger:
             self.assertEqual(stranger.get(self.base + '/invitation.svg').status_code, 403)

@@ -36,14 +36,14 @@ def new_item(kind):
 
 def check_capacity(room):
     cleanup_room(room)
-    if sum(not expired(item) for item in room["items"].values()) >= 500:
+    if len(room["items"]) >= 500:
         raise HTTPException(409, "This room has reached its content limit.")
 
 
 @router.get("/items")
 async def list_items(room=Depends(authorize)):
     cleanup_room(room)
-    return {"items": [public_item(item) for item in reversed(list(room["items"].values())) if not expired(item)],
+    return {"items": [public_item(item) for item in reversed(list(room["items"].values()))],
             "max_upload_bytes": config.MAX_UPLOAD_BYTES, "ttl_seconds": config.FILE_TTL_SECONDS}
 
 
@@ -63,7 +63,6 @@ async def share_content(body: ContentInput, room=Depends(authorize)):
             raise HTTPException(422, "Links must be valid http:// or https:// addresses.")
     item = new_item(body.kind)
     item["content"] = content
-    item["expires_at"] = now() + config.FILE_TTL_SECONDS
     room["items"][item["id"]] = item
     publish(room["id"])
     return public_item(item)
@@ -116,6 +115,8 @@ async def upload(request: Request, room=Depends(authorize)):
         if not completed:
             path.unlink(missing_ok=True)
     publish(room["id"])
+    from app.notifications import queue_upload_alerts
+    queue_upload_alerts(room, item)
     return public_item(item)
 
 
@@ -135,6 +136,10 @@ async def delete_item(item_id: str, room=Depends(owner_only)):
     item = room["items"].get(item_id)
     if item is None or expired(item):
         raise HTTPException(404, "Item not found in this room.")
+    if item["kind"] != "file":
+        del room["items"][item_id]
+        publish(room["id"])
+        return {"message": "Shared item deleted."}
     item["expires_at"] = 0
     cleanup_room(room)
     return {"message": "Shared item deleted."}
@@ -146,7 +151,7 @@ def now():
 
 
 def expired(item):
-    return item["expires_at"] <= now()
+    return item["kind"] == "file" and item["expires_at"] <= now()
 
 
 def cleanup_room(room):
@@ -173,8 +178,11 @@ def cleanup_room(room):
 def retire_room(room):
     """Revoke access now, but let existing downloads finish before deleting files."""
     room["closed"] = True
-    for item in room["items"].values():
-        item["expires_at"] = 0
+    for item_id, item in list(room["items"].items()):
+        if item["kind"] == "file":
+            item["expires_at"] = 0
+        else:
+            del room["items"][item_id]
     from app.rooms import sessions
     for session in sessions.values():
         session["rooms"].discard(room["id"])
@@ -190,8 +198,7 @@ def cleanup_once():
     for room in list(rooms.values()):
         cleanup_room(room)
         transferring = room.get("_uploads") or any(item.get("_downloads") for item in room["items"].values())
-        if room.get("closed") or (not connections.get(room["id"]) and not transferring
-                                  and time.time() - room.get("last_activity", time.time()) >= config.ROOM_IDLE_SECONDS):
+        if room["expires_at"] <= time.time() or room.get("closed"):
             retire_room(room)
     tracked = {item["path"] for room in rooms.values() for item in room["items"].values()
                if item["kind"] == "file"} | pending_uploads

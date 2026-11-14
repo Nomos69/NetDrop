@@ -18,7 +18,7 @@ class MemberTests(unittest.TestCase):
         self.guest = self.enterContext(TestClient(app))
         self.headers = {"X-NetDrop": "1"}
         result = self.owner.post("/api/rooms", headers=self.headers,
-                                 json={"name": "Members", "pin": "123456", "display_name": "Rhimar"})
+                                 json={"name": "Members", "pin": "1234", "display_name": "Rhimar"})
         self.room_id = result.json()["id"]
         self.base = f"/api/rooms/{self.room_id}"
 
@@ -27,7 +27,7 @@ class MemberTests(unittest.TestCase):
 
     def join(self, name="Alex"):
         return self.guest.post(self.base + "/join", headers=self.headers,
-                               json={"pin": "123456", "display_name": name})
+                               json={"pin": "1234", "display_name": name})
 
     def test_private_roster_names_and_leave(self):
         self.assertEqual(self.guest.get(self.base + "/members").status_code, 403)
@@ -40,7 +40,7 @@ class MemberTests(unittest.TestCase):
         self.join()
         self.assertEqual(len(self.members()), 2, "Rejoining must not duplicate a browser")
         other = self.guest.post("/api/rooms", headers=self.headers,
-                                json={"name": "Other", "pin": "654321"}).json()["id"]
+                                json={"name": "Other", "pin": "5678"}).json()["id"]
         self.assertEqual(len(self.guest.get(f"/api/rooms/{other}/members").json()["members"]), 1)
         self.guest.post(self.base + "/leave", headers=self.headers)
         self.assertEqual(len(self.members()), 1)
