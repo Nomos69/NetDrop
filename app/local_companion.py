@@ -15,6 +15,18 @@ from tkinter import messagebox, ttk
 from app.local_discovery import discover_local_hosts
 
 
+def host_url():
+    return f"http://127.0.0.1:{os.getenv('NETDROP_PORT', '8000')}"
+
+
+def run_host():
+    """Run the bundled FastAPI service when the packaged EXE is started with --host."""
+    import uvicorn
+    from app import config
+    from app.main import app
+    uvicorn.run(app, host=config.HOST, port=config.PORT)
+
+
 class LocalCompanion:
     def __init__(self, root):
         self.root = root
@@ -39,19 +51,21 @@ class LocalCompanion:
 
     def host_room(self):
         if self.server and self.server.poll() is None:
-            webbrowser.open("http://127.0.0.1:8000")
+            webbrowser.open(host_url())
             return
         environment = os.environ.copy()
         environment["NETDROP_SHARING_MODE"] = "local"
         environment["NETDROP_LOCAL_DISCOVERY"] = "1"
-        self.server = subprocess.Popen([sys.executable, "-m", "app.main"], env=environment)
+        command = [sys.executable, "--host"] if getattr(sys, "frozen", False) else [sys.executable, "-m", "app.main"]
+        self.server = subprocess.Popen(command, env=environment,
+                                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.status.config(text="Starting local host…")
         self.root.after(1200, self.open_host)
 
     def open_host(self):
         if self.server and self.server.poll() is None:
             self.status.config(text="Hosting locally. Keep NetDrop Local open while sharing.")
-            webbrowser.open("http://127.0.0.1:8000")
+            webbrowser.open(host_url())
         else:
             self.status.config(text="The local host could not start. Check whether port 8000 is already in use.")
 
@@ -88,6 +102,9 @@ class LocalCompanion:
 
 
 def main():
+    if "--host" in sys.argv:
+        run_host()
+        return
     root = tk.Tk()
     LocalCompanion(root)
     root.mainloop()

@@ -13,3 +13,5 @@ data/uploads/*
 build/
 dist/
 *.spec
+!packaging/NetDropLocal.spec
+.build-venv/

@@ -1,0 +1,22 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Build installer
+        shell: powershell
+        run: .\packaging\build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NetDrop-Local-Setup
+          path: dist/installer/NetDrop-Local-Setup.exe

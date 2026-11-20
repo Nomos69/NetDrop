@@ -2,13 +2,17 @@
 
 import os
 import ipaddress
+import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
+BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+DATA_DIR = (Path(os.getenv("LOCALAPPDATA", Path.home() / ".local")) / "NetDrop"
+            if getattr(sys, "frozen", False) else BASE_DIR / "data")
+load_dotenv((DATA_DIR if getattr(sys, "frozen", False) else BASE_DIR) / ".env")
 
 
 def positive_integer(name: str, default: int) -> int:
@@ -28,8 +32,8 @@ PORT = positive_integer("NETDROP_PORT", 8000)
 if PORT > 65535:
     raise ValueError("NETDROP_PORT must be between 1 and 65535")
 
-STATIC_DIR = BASE_DIR / "static"
-UPLOAD_DIR = BASE_DIR / "data" / "uploads"
+STATIC_DIR = BUNDLE_DIR / "static"
+UPLOAD_DIR = DATA_DIR / "uploads"
 FILE_TTL_SECONDS = positive_integer("NETDROP_FILE_TTL_SECONDS", 1800)
 MAX_UPLOAD_BYTES = positive_integer("NETDROP_MAX_UPLOAD_BYTES", 50_000_000)
 

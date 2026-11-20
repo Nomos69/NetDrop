@@ -124,6 +124,19 @@ local server, or **Scan local rooms** to find a host and open it. The final
 Windows installer is the next implementation phase; it will bundle Python,
 this companion, and the required mDNS discovery library.
 
+#### Build the Windows installer
+
+On a Windows build machine, install Python 3.12+ and Inno Setup 6, then run:
+
+```powershell
+.\packaging\build-windows.ps1
+```
+
+The installer is created at `dist\installer\NetDrop-Local-Setup.exe`. It bundles
+the companion, server, browser assets, and mDNS discovery; it also adds private-
+network firewall rules for NetDrop's TCP port and local discovery. The GitHub
+Actions workflow can build the same installer manually from the Actions tab.
+
 On Windows PowerShell, activate the environment with:
 
 ```powershell

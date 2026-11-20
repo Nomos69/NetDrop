@@ -105,7 +105,7 @@ async def upload(request: Request, room=Depends(authorize)):
         item.update(name=name, size=size, path=path,
                     created_at=datetime.fromtimestamp(saved_at, timezone.utc).isoformat(),
                     expires_at=saved_at + config.FILE_TTL_SECONDS)
-        room["items"][item["id"]] = item
+        room["items"][item["id"]] = item    
         completed = True
     except OSError as error:
         raise HTTPException(507, "Unable to save the file on the host.") from error
