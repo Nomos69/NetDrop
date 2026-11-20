@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import config, files, notifications, realtime, rooms
+from app.local_discovery import LocalAdvertiser
 
 
 @asynccontextmanager
@@ -16,9 +17,14 @@ async def lifespan(app: FastAPI):
     config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     files.cleanup_once()
     cleanup = asyncio.create_task(files.cleanup_loop())
+    advertiser = LocalAdvertiser(config.PORT) if config.SHARING_MODE == "local" and config.LOCAL_DISCOVERY else None
+    if advertiser is not None:
+        advertiser.start()
     try:
         yield
     finally:
+        if advertiser is not None:
+            advertiser.stop()
         cleanup.cancel()
         with suppress(asyncio.CancelledError):
             await cleanup

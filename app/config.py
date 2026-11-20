@@ -48,6 +48,8 @@ SHARING_MODE = os.getenv("NETDROP_SHARING_MODE", "local").strip().lower()
 if SHARING_MODE not in {"local", "online"}:
     raise ValueError("NETDROP_SHARING_MODE must be local or online")
 
+LOCAL_DISCOVERY = os.getenv("NETDROP_LOCAL_DISCOVERY", "1").strip().lower() in {"1", "true", "yes"}
+
 
 def server_url(name, online=False):
     value = os.getenv(name, "").strip().rstrip("/")

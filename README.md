@@ -115,6 +115,15 @@ shows the PIN or shared files. A normal browser cannot discover the host compute
 on a LAN by itself, so participants still need its local address (or a separately
 configured local DNS/Bonjour name) to open NetDrop first.
 
+### Local companion (installer foundation)
+
+The Windows Local companion is the native part that can discover nearby NetDrop
+hosts over the same Wi-Fi. During development, install dependencies and run it
+with `python -m app.local_companion`. Select **Host a local room** to start the
+local server, or **Scan local rooms** to find a host and open it. The final
+Windows installer is the next implementation phase; it will bundle Python,
+this companion, and the required mDNS discovery library.
+
 On Windows PowerShell, activate the environment with:
 
 ```powershell

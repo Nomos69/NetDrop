@@ -15,4 +15,5 @@ typing_extensions==4.16.0
 uvicorn==0.54.0
 websockets==17.2
 qrcode==8.2
+zeroconf>=0.131,<1
 httpx==0.28.1
