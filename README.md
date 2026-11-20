@@ -96,6 +96,10 @@ python -m app.main
 
 Open `http://127.0.0.1:8000` on the host computer.
 
+After this one-time setup, start NetDrop by double-clicking **Start-NetDrop.bat**
+on Windows, or run/double-click **start-netdrop.sh** on Linux. The starter opens
+the browser and keeps the local server running in its terminal window.
+
 For another device on the same network, find the host address with:
 
 ```bash
