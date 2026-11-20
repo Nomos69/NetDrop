@@ -137,6 +137,10 @@ the companion, server, browser assets, and mDNS discovery; it also adds private-
 network firewall rules for NetDrop's TCP port and local discovery. The GitHub
 Actions workflow can build the same installer manually from the Actions tab.
 
+After attaching that installer to a GitHub Release as `NetDrop-Local-Setup.exe`,
+the website's **Local Network** tab downloads it directly. Set
+`NETDROP_LOCAL_INSTALLER_URL` if you host the installer elsewhere.
+
 On Windows PowerShell, activate the environment with:
 
 ```powershell

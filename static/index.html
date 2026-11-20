@@ -7,8 +7,8 @@
   <meta name="description" content="Share temporary files, text, and links securely with NetDrop.">
   <title>NetDrop — File &amp; Clipboard Sharing</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=20261120b">
-  <script src="/static/app.js?v=20261120b" defer></script>
+  <link rel="stylesheet" href="/static/styles.css?v=20261120c">
+  <script src="/static/app.js?v=20261120c" defer></script>
 </head>
 <body>
   <main>
@@ -26,6 +26,17 @@
           <button id="mode-online" type="button" aria-pressed="false">Online</button>
         </div>
         <p id="mode-help" class="connection-help" role="status">Share on the same Wi-Fi or LAN.</p>
+        <section id="local-install" class="local-install" hidden aria-labelledby="local-install-heading">
+          <h3 id="local-install-heading">Use Local Network</h3>
+          <p>Install NetDrop Local on each Windows device. Rooms, users, and files stay on the same Wi-Fi network.</p>
+          <a id="local-installer" class="installer-button" href="https://github.com/Nomos69/NetDrop/releases/latest/download/NetDrop-Local-Setup.exe">Download NetDrop Local for Windows</a>
+          <ol>
+            <li>Install and open NetDrop Local.</li>
+            <li>The host chooses <strong>Host a local room</strong> and creates a room.</li>
+            <li>Others choose <strong>Scan local rooms</strong>, select the host, then enter the room PIN.</li>
+          </ol>
+          <p class="installer-note">Local rooms and files are not sent to the Online server.</p>
+        </section>
         <form id="server-form" hidden novalidate>
           <label id="server-label" for="server-link">Or paste invite link</label>
           <input id="server-link" type="url" placeholder="https://netdrop.example/#room=…" autocomplete="url" aria-describedby="server-help">

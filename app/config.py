@@ -76,6 +76,12 @@ LOCAL_URL = server_url("NETDROP_LOCAL_URL")
 ONLINE_URL = server_url("NETDROP_ONLINE_URL", online=True)
 if SHARING_MODE == "online" and not ONLINE_URL:
     raise ValueError("Online mode requires NETDROP_ONLINE_URL with the public HTTPS address")
+LOCAL_INSTALLER_URL = os.getenv(
+    "NETDROP_LOCAL_INSTALLER_URL",
+    "https://github.com/Nomos69/NetDrop/releases/latest/download/NetDrop-Local-Setup.exe",
+).strip()
+if not LOCAL_INSTALLER_URL.startswith("https://"):
+    raise ValueError("NETDROP_LOCAL_INSTALLER_URL must use HTTPS")
 
 
 def sharing_mode(request):

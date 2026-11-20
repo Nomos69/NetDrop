@@ -55,7 +55,8 @@ app.add_middleware(OnlineHTTPS)
 async def sharing(request: Request):
     mode = config.sharing_mode(request)
     return {"mode": mode, "local_url": config.LOCAL_URL,
-            "online_url": config.ONLINE_URL or (str(request.base_url).rstrip("/") if mode == "online" else "")}
+            "online_url": config.ONLINE_URL or (str(request.base_url).rstrip("/") if mode == "online" else ""),
+            "local_installer_url": config.LOCAL_INSTALLER_URL}
 
 
 app.include_router(rooms.router)

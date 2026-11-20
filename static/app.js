@@ -14,7 +14,7 @@ function browserMode() {
     || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(host);
   return location.protocol === 'https:' && !privateHost ? 'online' : 'local';
 }
-let sharingConfig = { mode: browserMode(), local_url: '', online_url: '' };
+let sharingConfig = { mode: browserMode(), local_url: '', online_url: '', local_installer_url: '' };
 let selectedMode = sharingConfig.mode;
 let modeChosen = false;
 let settingsFailed = false;
@@ -37,13 +37,15 @@ function updateMode() {
     $(`mode-${mode}`).disabled = busy;
   }
   $('mode-badge').textContent = sharingConfig.mode === 'local' ? 'LOCAL NETWORK' : 'ONLINE';
-  $('server-form').hidden = current;
+  const showLocalInstaller = selectedMode === 'local' && !current;
+  $('local-install').hidden = !showLocalInstaller;
+  $('server-form').hidden = current || showLocalInstaller;
   $('lobby').hidden = Boolean(activeRoom) || !current;
   $('local-rooms').hidden = Boolean(activeRoom) || !current || sharingConfig.mode !== 'local';
   $('retry-settings').hidden = !settingsFailed;
   $('mode-help').textContent = current
     ? (selectedMode === 'local' ? 'Share on the same Wi-Fi or LAN. No internet needed.' : 'Share across different networks through this HTTPS server.')
-    : (selectedMode === 'online' ? 'Connect to an online host using its HTTPS address or invitation link.' : 'Connect to the host’s local address while on the same Wi-Fi or LAN.');
+    : (selectedMode === 'online' ? 'Connect to an online host using its HTTPS address or invitation link.' : 'Download NetDrop Local to create or scan rooms on this Wi-Fi network.');
   $('server-label').textContent = selectedMode === 'online' ? 'Or paste invite link' : 'Local host or invite link';
   $('server-help').textContent = selectedMode === 'online'
     ? 'Paste the host’s HTTPS server address or room invitation link. Internet required.'
@@ -117,6 +119,7 @@ async function loadSharingSettings() {
     const data = await api('/sharing');
     if (!['local', 'online'].includes(data.mode)) throw new Error('Invalid settings');
     sharingConfig = data;
+    if (data.local_installer_url) $('local-installer').href = data.local_installer_url;
     if (!modeChosen) selectedMode = data.mode;
     if (!$('server-link').value) $('server-link').value = data[`${selectedMode}_url`] || '';
     settingsFailed = false;
