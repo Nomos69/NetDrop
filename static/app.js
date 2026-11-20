@@ -37,9 +37,7 @@ function updateMode() {
     $(`mode-${mode}`).disabled = busy;
   }
   $('mode-badge').textContent = sharingConfig.mode === 'local' ? 'LOCAL NETWORK' : 'ONLINE';
-  const showLocalChoice = selectedMode === 'local' && !current;
-  $('local-choice').hidden = !showLocalChoice;
-  $('server-form').hidden = current || (showLocalChoice && !$('connect-local-server').dataset.selected);
+  $('server-form').hidden = current;
   $('lobby').hidden = Boolean(activeRoom) || !current;
   $('local-rooms').hidden = Boolean(activeRoom) || !current || sharingConfig.mode !== 'local';
   $('retry-settings').hidden = !settingsFailed;
@@ -90,8 +88,6 @@ for (const mode of ['local', 'online']) {
   $(`mode-${mode}`).addEventListener('click', () => {
     modeChosen = true;
     selectedMode = mode;
-    delete $('connect-local-server').dataset.selected;
-    $('local-start-help').hidden = true;
     $('server-link').value = sharingConfig[`${mode}_url`] || '';
     $('server-link').setCustomValidity('');
     updateMode();
@@ -114,14 +110,6 @@ $('server-form').addEventListener('submit', (event) => {
       : 'Enter a complete local host address, such as http://192.168.1.12:8000.');
     input.reportValidity();
   }
-});
-$('start-local-server').addEventListener('click', () => {
-  $('local-start-help').hidden = !$('local-start-help').hidden;
-});
-$('connect-local-server').addEventListener('click', () => {
-  $('connect-local-server').dataset.selected = 'true';
-  updateMode();
-  $('server-link').focus();
 });
 
 async function loadSharingSettings() {

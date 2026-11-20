@@ -26,18 +26,6 @@
           <button id="mode-online" type="button" aria-pressed="false">Online</button>
         </div>
         <p id="mode-help" class="connection-help" role="status">Share on the same Wi-Fi or LAN.</p>
-        <section id="local-choice" class="local-choice" hidden aria-labelledby="local-choice-heading">
-          <h3 id="local-choice-heading">Use Local Network</h3>
-          <p>Choose whether this device hosts the room or joins a NetDrop server that is already running.</p>
-          <div class="local-choice-actions">
-            <button id="start-local-server" type="button">Start a server on this computer</button>
-            <button id="connect-local-server" type="button" class="secondary">Connect to a running server</button>
-          </div>
-          <div id="local-start-help" class="local-start-help" hidden>
-            <p><strong>Server starter:</strong> open <code>Start-NetDrop.bat</code> on Windows, or <code>start-netdrop.sh</code> on Linux. It starts NetDrop and opens this page.</p>
-            <p>A browser is not permitted to start Python directly. Keep the starter window open while people share files.</p>
-          </div>
-        </section>
         <form id="server-form" hidden novalidate>
           <label id="server-label" for="server-link">Or paste invite link</label>
           <input id="server-link" type="url" placeholder="https://netdrop.example/#room=…" autocomplete="url" aria-describedby="server-help">
