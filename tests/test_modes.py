@@ -87,3 +87,11 @@ class ModeTests(unittest.TestCase):
                     config.server_url('TEST_MODE_URL', online=True)
         with patch.dict('os.environ', {'TEST_MODE_URL': 'https://example.com/'}):
             self.assertEqual(config.server_url('TEST_MODE_URL', online=True), 'https://example.com')
+
+    def test_lan_hostname_validation(self):
+        with patch.dict('os.environ', {'TEST_LAN_HOSTNAME': 'netdrop'}):
+            self.assertEqual(config.lan_hostname('TEST_LAN_HOSTNAME'), 'netdrop')
+        for value in ['netdrop.local', 'net drop', '-netdrop', 'netdrop-']:
+            with self.subTest(value=value), patch.dict('os.environ', {'TEST_LAN_HOSTNAME': value}):
+                with self.assertRaises(ValueError):
+                    config.lan_hostname('TEST_LAN_HOSTNAME')

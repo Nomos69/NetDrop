@@ -55,6 +55,20 @@ if SHARING_MODE not in {"local", "online"}:
 LOCAL_DISCOVERY = os.getenv("NETDROP_LOCAL_DISCOVERY", "1").strip().lower() in {"1", "true", "yes"}
 
 
+def lan_hostname(name):
+    value = os.getenv(name, "").strip()
+    if not value:
+        return ""
+    if "." in value or not value.replace("-", "").isalnum():
+        raise ValueError(f"{name} must be a single mDNS label without dots")
+    if value.startswith("-") or value.endswith("-"):
+        raise ValueError(f"{name} must not start or end with a hyphen")
+    return value
+
+
+LAN_HOSTNAME = lan_hostname("NETDROP_LAN_HOSTNAME")
+
+
 def server_url(name, online=False):
     value = os.getenv(name, "").strip().rstrip("/")
     if not value:

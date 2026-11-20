@@ -176,6 +176,7 @@ file, and the server must be restarted after changes.
 | `NETDROP_ROOM_TTL_SECONDS` | `259200` | Maximum room lifetime: three days |
 | `NETDROP_INVITATION_TTL_SECONDS` | `86400` | Email invitation-token lifetime |
 | `NETDROP_SHARING_MODE` | `local` | This server's mode: `local` or `online` |
+| `NETDROP_LAN_HOSTNAME` | empty | Optional mDNS label, such as `netdrop` for `netdrop.local` |
 | `NETDROP_LOCAL_URL` | empty | Reachable LAN origin used in local invitations |
 | `NETDROP_ONLINE_URL` | empty | Public HTTPS origin used in online invitations |
 | `BREVO_API_KEY` | empty | Optional Brevo API key; never commit this value |
@@ -199,6 +200,91 @@ NETDROP_ONLINE_URL=https://your-service.onrender.com
 
 Use only the HTTPS origin for `NETDROP_ONLINE_URL`: no path, query, fragment, or
 credentials.
+
+## Custom domain with Cloudflare Tunnel
+
+This setup gives NetDrop a stable public hostname without opening a router port.
+The custom domain is the recurring cost; Cloudflare DNS and Cloudflare Tunnel can
+provide the DNS/TLS/tunnel infrastructure for free.
+
+### 1. Buy the domain
+
+Use a registrar such as Namecheap. Before payment:
+
+- Compare the first-year and renewal price, not only the promotion.
+- Choose a simple name, for example `netdropyourname.xyz` or `netdropteam.com`.
+- Prefer one year initially if the student project may end soon.
+- Review WHOIS privacy, auto-renewal, and the registrar transfer policy.
+- Disable unrelated registrar add-ons; DNS hosting is handled through Cloudflare.
+- Keep the registrar account recovery email and password secure.
+
+Do not buy DNS separately from Cloudflare unless a specific feature requires it.
+
+### 2. Add the domain to Cloudflare
+
+1. Create or sign in to a Cloudflare account.
+2. Select **Add a domain** and enter the exact domain purchased at Namecheap.
+3. Choose the free plan.
+4. Cloudflare will show two assigned nameservers.
+5. In Namecheap, open **Domain List → Manage → Nameservers → Custom DNS**.
+6. Paste Cloudflare's nameservers exactly, remove Namecheap's nameserver entries,
+   and save.
+7. Wait for Cloudflare to report that the domain is active. DNS changes can take
+   from minutes to several hours.
+
+Do not add an A record to your home or lab public IP. A Cloudflare Tunnel does not
+require opening ports or configuring a public IP.
+
+### 3. Install Cloudflare Tunnel on Windows
+
+Install `cloudflared` and authenticate in PowerShell:
+
+```powershell
+winget install --id Cloudflare.cloudflared
+cloudflared tunnel login
+cloudflared tunnel create netdrop
+cloudflared tunnel route dns netdrop netdrop.example.com
+```
+
+Replace `netdrop.example.com` with a subdomain of the domain you purchased.
+Keep the tunnel token or credentials file private. Do not commit it to Git.
+
+Next, create a Cloudflare tunnel configuration in
+`%USERPROFILE%\.cloudflared\config.yml`:
+
+```yaml
+tunnel: netdrop
+credentials-file: C:\Users\YOUR_USERNAME\.cloudflared\TUNNEL-ID.json
+
+ingress:
+  - hostname: netdrop.example.com
+    service: http://127.0.0.1:8000
+  - service: http_status:404
+```
+
+Replace `YOUR_USERNAME`, `TUNNEL-ID`, and `netdrop.example.com`. The tunnel's
+public hostname must use your domain and must route to the local NetDrop server.
+
+Add this to `.env`:
+
+```dotenv
+NETDROP_SHARING_MODE=online
+NETDROP_ONLINE_URL=https://netdrop.example.com
+```
+
+Start NetDrop and the tunnel:
+
+```powershell
+.\Start-NetDrop-Cloudflare.bat netdrop
+```
+
+Keep both processes running. Cloudflare HTTPS will terminate public TLS and
+forward a secure connection to NetDrop's local HTTP server. Do not expose
+Uvicorn directly to the internet or enable router port forwarding.
+
+The named-tunnel setup is permanent until the domain, tunnel, or credentials are
+removed. If this is only for a short demo, check Cloudflare's dashboard and
+remove or stop the tunnel when the project ends.
 
 ## Deploy on Render
 

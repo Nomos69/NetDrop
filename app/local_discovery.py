@@ -40,8 +40,9 @@ def local_ipv4_addresses():
 class LocalAdvertiser:
     """Advertise one local NetDrop host for the lifetime of its server."""
 
-    def __init__(self, port):
+    def __init__(self, port, hostname=""):
         self.port = port
+        self.hostname = hostname
         self.zeroconf = None
         self.info = None
 
@@ -51,10 +52,10 @@ class LocalAdvertiser:
         addresses = local_ipv4_addresses()
         if not addresses:
             return False
-        label = socket.gethostname().replace(".", "-")[:48] or "NetDrop"
+        label = self.hostname or socket.gethostname().replace(".", "-")[:48] or "NetDrop"
         self.info = ServiceInfo(
             SERVICE_TYPE,
-            f"NetDrop on {label}.{SERVICE_TYPE}",
+            f"{label}.{SERVICE_TYPE}",
             addresses=[socket.inet_aton(address) for address in addresses],
             port=self.port,
             properties={b"path": b"/", b"product": b"NetDrop"},

@@ -17,7 +17,8 @@ async def lifespan(app: FastAPI):
     config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     files.cleanup_once()
     cleanup = asyncio.create_task(files.cleanup_loop())
-    advertiser = LocalAdvertiser(config.PORT) if config.SHARING_MODE == "local" and config.LOCAL_DISCOVERY else None
+    advertiser = (LocalAdvertiser(config.PORT, config.LAN_HOSTNAME)
+                  if config.SHARING_MODE == "local" and config.LOCAL_DISCOVERY else None)
     if advertiser is not None:
         advertiser.start()
     try:
