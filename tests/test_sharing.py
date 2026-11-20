@@ -116,6 +116,14 @@ class SharingTests(unittest.TestCase):
         for path in ['/', '/static/styles.css', '/static/app.js']:
             self.assertEqual(self.owner.get(path).status_code, 200)
 
+    def test_local_room_discovery_lists_active_rooms_without_pin(self):
+        response = self.guest.get('/api/rooms/discover')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['rooms'], [{
+            'id': self.room, 'name': 'Study group', 'expires_at': rooms.rooms[self.room]['expires_at']
+        }])
+        self.assertNotIn('pin', str(response.json()).lower())
+
 
 if __name__ == '__main__':
     unittest.main()

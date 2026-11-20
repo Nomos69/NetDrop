@@ -89,6 +89,22 @@ def public_room(room, request, session=None):
             "expires_at": room["expires_at"]}
 
 
+@router.get("/rooms/discover")
+async def discover_rooms(request: Request):
+    """Expose active room names only on the local server; PINs stay private."""
+    if config.sharing_mode(request) != "local":
+        raise HTTPException(404, "Local room discovery is unavailable on an online server.")
+    from app.files import cleanup_once
+    cleanup_once()
+    now = time.time()
+    available = [
+        {"id": room["id"], "name": room["name"], "expires_at": room["expires_at"]}
+        for room in rooms.values()
+        if not room.get("closed") and room["expires_at"] > now
+    ]
+    return {"rooms": sorted(available, key=lambda room: room["name"].lower())}
+
+
 @router.post("/rooms", status_code=201, dependencies=[Depends(browser_write)])
 async def create_room(body: RoomInput, request: Request, response: Response):
     name = body.name.strip()

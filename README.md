@@ -109,6 +109,12 @@ hostname -I
 Then open `http://HOST_LAN_IP:8000`, for example
 `http://192.168.1.12:8000`. The host firewall must allow the configured port.
 
+In Local Network mode, participants who have opened the host can use **Scan rooms**
+to see active room names, select a room, and enter its PIN. Room discovery never
+shows the PIN or shared files. A normal browser cannot discover the host computer
+on a LAN by itself, so participants still need its local address (or a separately
+configured local DNS/Bonjour name) to open NetDrop first.
+
 On Windows PowerShell, activate the environment with:
 
 ```powershell

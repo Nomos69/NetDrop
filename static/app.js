@@ -41,6 +41,7 @@ function updateMode() {
   $('local-choice').hidden = !showLocalChoice;
   $('server-form').hidden = current || (showLocalChoice && !$('connect-local-server').dataset.selected);
   $('lobby').hidden = Boolean(activeRoom) || !current;
+  $('local-rooms').hidden = Boolean(activeRoom) || !current || sharingConfig.mode !== 'local';
   $('retry-settings').hidden = !settingsFailed;
   $('mode-help').textContent = current
     ? (selectedMode === 'local' ? 'Share on the same Wi-Fi or LAN. No internet needed.' : 'Share across different networks through this HTTPS server.')
@@ -52,6 +53,38 @@ function updateMode() {
   $('switch-mode').textContent = `Connect to ${selectedMode === 'online' ? 'online' : 'local'} server`;
   $('connection-caption').textContent = selectedMode === 'online' ? 'CONNECT VIA AN HTTPS HOST' : 'DEVICES MUST BE ON THE SAME NETWORK';
 }
+
+async function scanLocalRooms() {
+  if (sharingConfig.mode !== 'local' || activeRoom) return;
+  const result = await api('/rooms/discover');
+  const list = $('local-room-list');
+  list.replaceChildren();
+  for (const room of result.rooms) {
+    const item = document.createElement('li');
+    item.className = 'local-room';
+    const details = document.createElement('span');
+    const name = document.createElement('span');
+    name.className = 'local-room-name';
+    name.textContent = room.name;
+    const id = document.createElement('span');
+    id.className = 'local-room-id';
+    id.textContent = `Room ID: ${room.id}`;
+    details.append(name, id);
+    const join = document.createElement('button');
+    join.type = 'button';
+    join.className = 'secondary';
+    join.textContent = 'Join room';
+    join.addEventListener('click', () => {
+      $('room-id').value = room.id;
+      setRoomAction('join');
+      $('join-pin').focus();
+    });
+    item.append(details, join);
+    list.append(item);
+  }
+  $('local-room-empty').hidden = result.rooms.length > 0;
+}
+$('scan-local-rooms').addEventListener('click', () => scanLocalRooms().catch((error) => status(error.message, true)));
 
 for (const mode of ['local', 'online']) {
   $(`mode-${mode}`).addEventListener('click', () => {
@@ -105,6 +138,7 @@ async function loadSharingSettings() {
     status('Connection settings are unavailable. You can still choose a mode and paste the host’s invite link. Restart or update the server, then retry.', true);
   }
   updateMode();
+  scanLocalRooms().catch(() => {});
 }
 $('retry-settings').addEventListener('click', loadSharingSettings);
 
@@ -471,6 +505,7 @@ for (const action of ['create', 'join']) {
       renderPin($(`${action}-pin`));
       showRoom(room);
       await refresh();
+      scanLocalRooms().catch(() => {});
       status(`Joined ${room.name}.`);
     });
   });

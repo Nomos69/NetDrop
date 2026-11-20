@@ -7,8 +7,8 @@
   <meta name="description" content="Share temporary files, text, and links securely with NetDrop.">
   <title>NetDrop — File &amp; Clipboard Sharing</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=20261120a">
-  <script src="/static/app.js?v=20261120a" defer></script>
+  <link rel="stylesheet" href="/static/styles.css?v=20261120b">
+  <script src="/static/app.js?v=20261120b" defer></script>
 </head>
 <body>
   <main>
@@ -51,6 +51,11 @@
           <button id="action-join" type="button" aria-pressed="true">Join a room</button>
           <button id="action-create" type="button" aria-pressed="false">Create a room</button>
         </div>
+        <section id="local-rooms" class="local-rooms" hidden aria-labelledby="local-rooms-heading">
+          <div class="room-heading"><div><h2 id="local-rooms-heading">Available local rooms</h2><p>Rooms on this NetDrop host. Select one, then enter its PIN.</p></div><button id="scan-local-rooms" class="secondary" type="button">Scan rooms</button></div>
+          <ul id="local-room-list" aria-live="polite"></ul>
+          <p id="local-room-empty" class="field-hint">No rooms available yet.</p>
+        </section>
         <form id="join-form" novalidate>
           <label for="room-id">Room ID</label><input id="room-id" required pattern="[a-fA-F0-9]{12}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="room-id-help" placeholder="a1b2c3d4e5f6">
           <p id="room-id-help">12-character room ID · 0–9 and a–f</p>
