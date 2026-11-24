@@ -1,12 +1,16 @@
 const $ = (id) => document.getElementById(id);
 let activeRoom = null;
 let maxUploadBytes = 0;
+let fileTtlSeconds = 1800;
 let liveSocket = null;
 let reconnectTimer = null;
 let heartbeatTimer = null;
 let reconnectDelay = 1000;
 let refreshNumber = 0;
 let busy = false;
+let feedItems = [];
+let feedPage = 1;
+const FEED_PAGE_SIZE = 6;
 
 function setRoomAction(action) {
   for (const choice of ['join', 'create']) {
@@ -190,6 +194,8 @@ function showRoom(room) {
   refreshNumber += 1;
   if (activeRoom && (!room || activeRoom.id !== room.id)) clearUploads();
   activeRoom = room;
+  feedPage = 1;
+  feedItems = [];
   $('close-room').hidden = !room?.is_owner;
   $('auth-shell').hidden = Boolean(room);
   document.body.classList.toggle('in-room', Boolean(room));
@@ -217,15 +223,37 @@ async function refresh() {
   const [data] = await Promise.all([api(`/rooms/${room.id}/items`), refreshMembers(room)]);
   if (activeRoom !== room || number !== refreshNumber) return;
   maxUploadBytes = data.max_upload_bytes;
+  fileTtlSeconds = data.ttl_seconds;
   $('upload-limit').textContent = `Maximum file size: ${maxUploadBytes.toLocaleString()} bytes. Files expire after ${data.ttl_seconds / 60} minutes; notes and links remain until the room closes.`;
-  $('items').replaceChildren();
-  if (!data.items.length) {
+  feedItems = data.items;
+  const pageCount = Math.max(1, Math.ceil(feedItems.length / FEED_PAGE_SIZE));
+  feedPage = Math.min(feedPage, pageCount);
+  renderFeed(room);
+}
+
+function contentIcon(kind) {
+  return kind === 'file' ? '↥' : kind === 'link' ? '↗' : '✦';
+}
+
+function renderFeed(room) {
+  const list = $('items');
+  list.replaceChildren();
+  if (!feedItems.length) {
     const item = document.createElement('li');
-    item.textContent = 'Nothing shared yet. Add the first file, note, or link.';
-    $('items').append(item);
+    item.className = 'empty-feed';
+    item.innerHTML = '<span aria-hidden="true">✦</span><strong>No shared content yet</strong><p>Upload a file, share a note, or add a link to get started.</p>';
+    list.append(item);
   }
-  for (const item of data.items) {
+  const start = (feedPage - 1) * FEED_PAGE_SIZE;
+  for (const item of feedItems.slice(start, start + FEED_PAGE_SIZE)) {
     const row = document.createElement('li');
+    row.className = 'feed-item';
+    const icon = document.createElement('span');
+    icon.className = `content-icon ${item.kind}`;
+    icon.textContent = contentIcon(item.kind);
+    icon.setAttribute('aria-hidden', 'true');
+    const body = document.createElement('div');
+    body.className = 'feed-item-body';
     const label = document.createElement(item.kind === 'text' ? 'p' : 'a');
     label.textContent = item.kind === 'file' ? item.name : item.content;
     if (item.kind === 'file') {
@@ -238,12 +266,18 @@ async function refresh() {
     }
     const details = document.createElement('small');
     details.textContent = `${item.kind}${item.kind === 'file' ? ` · ${item.size.toLocaleString()} bytes` : ''} · ${new Date(item.created_at).toLocaleString()}${item.kind === 'file' ? ` · Expires ${new Date(item.expires_at * 1000).toLocaleTimeString()}` : ' · Available while the room is open'}`;
-    row.append(label, details);
+    body.append(label, details);
     if (item.kind === 'file') {
-      const countdown = document.createElement('small');
-      countdown.dataset.expires = item.expires_at;
-      row.append(countdown);
+      const timer = document.createElement('div');
+      timer.className = 'file-timer';
+      timer.dataset.expires = item.expires_at;
+      timer.dataset.duration = fileTtlSeconds;
+      timer.setAttribute('role', 'status');
+      timer.setAttribute('aria-label', 'File expiration countdown');
+      timer.innerHTML = '<svg viewBox="0 0 42 42" aria-hidden="true"><circle class="timer-track" cx="21" cy="21" r="17"></circle><circle class="timer-progress" cx="21" cy="21" r="17"></circle></svg><span class="timer-value"></span><small class="timer-label">left</small>';
+      row.append(timer);
     }
+    row.append(icon, body);
     if (room.is_owner) {
       const remove = document.createElement('button');
       remove.className = 'secondary';
@@ -259,8 +293,13 @@ async function refresh() {
       };
       row.append(remove);
     }
-    $('items').append(row);
+    list.append(row);
   }
+  const pageCount = Math.max(1, Math.ceil(feedItems.length / FEED_PAGE_SIZE));
+  $('feed-pagination').hidden = feedItems.length <= FEED_PAGE_SIZE;
+  $('feed-page').textContent = `Page ${feedPage} of ${pageCount}`;
+  $('feed-prev').disabled = feedPage === 1;
+  $('feed-next').disabled = feedPage === pageCount;
   updateCountdowns();
 }
 
@@ -392,6 +431,19 @@ function updateCountdowns() {
     const seconds = Math.max(0, Math.ceil(Number(label.dataset.expires) - Date.now() / 1000));
     label.textContent = seconds ? `Expires in ${Math.floor(seconds / 60)}m ${seconds % 60}s` : 'Expired · awaiting cleanup';
   }
+  for (const timer of document.querySelectorAll('.file-timer')) {
+    const seconds = Math.max(0, Math.ceil(Number(timer.dataset.expires) - Date.now() / 1000));
+    const duration = Math.max(1, Number(timer.dataset.duration) || fileTtlSeconds);
+    const progress = Math.min(1, seconds / duration);
+    const ring = timer.querySelector('.timer-progress');
+    ring.style.strokeDashoffset = String(107 * (1 - progress));
+    timer.querySelector('.timer-value').textContent = seconds >= 60
+      ? `${Math.floor(seconds / 60)}m`
+      : `${seconds}s`;
+    timer.classList.toggle('warning', seconds > 0 && seconds <= Math.min(300, duration * .2));
+    timer.classList.toggle('expired', seconds === 0);
+    timer.setAttribute('aria-label', seconds ? `${seconds} seconds until this file expires` : 'This file has expired');
+  }
   if (activeRoom?.expires_at) {
     const seconds = Math.max(0, Math.ceil(Number(activeRoom.expires_at) - Date.now() / 1000));
     $('room-mode').textContent = `Online room · Room expires in ${Math.floor(seconds / 86400)}d ${Math.floor(seconds % 86400 / 3600)}h`;
@@ -515,6 +567,17 @@ $('content-form').addEventListener('submit', (event) => {
 $('refresh').addEventListener('click', (event) => perform(event.currentTarget, async () => {
   await refresh(); status('Content refreshed.');
 }));
+$('feed-prev').addEventListener('click', () => {
+  if (!activeRoom || feedPage === 1) return;
+  feedPage -= 1;
+  renderFeed(activeRoom);
+});
+$('feed-next').addEventListener('click', () => {
+  const pageCount = Math.ceil(feedItems.length / FEED_PAGE_SIZE);
+  if (!activeRoom || feedPage >= pageCount) return;
+  feedPage += 1;
+  renderFeed(activeRoom);
+});
 $('leave').addEventListener('click', (event) => perform(event.currentTarget, async () => {
   await api(`/rooms/${activeRoom.id}/leave`, { method: 'POST' });
   showRoom(null); status('Left room.');

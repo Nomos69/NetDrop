@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#252525">
+  <meta name="theme-color" content="#182033">
   <meta name="description" content="Share temporary files, text, and links securely with NetDrop.">
   <title>NetDrop — File &amp; Clipboard Sharing</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=20261124-online">
-  <script src="/static/app.js?v=20261124-online" defer></script>
+  <link rel="stylesheet" href="/static/styles.css?v=20261125-ui">
+  <script src="/static/app.js?v=20261125-timer" defer></script>
 </head>
 <body>
   <main>
@@ -16,13 +16,15 @@
     <section id="auth-shell" class="auth-shell" aria-label="NetDrop connection">
       <header class="brand-header">
         <img class="brand-logo" src="/static/logo.svg" width="52" height="52" alt="">
-        <div><h1>NETDROP</h1><p class="eyebrow">FILE &amp; CLIPBOARD SHARING</p></div>
+        <div><p class="product-label">NETDROP</p><h1>Share in a private room.</h1></div>
       </header>
-      <p class="brand-note">A private, temporary room for files, links, and notes.</p>
+      <div class="online-notice"><span aria-hidden="true"></span><p>Secure online sharing · No account required</p></div>
+      <p class="brand-note">Create a temporary room or join one with a room ID and PIN. Files, notes, and links update live for everyone inside.</p>
       <section id="lobby">
+        <div class="lobby-heading"><p class="eyebrow">YOUR ROOM</p><p>Choose how you want to begin.</p></div>
         <div class="action-tabs" role="group" aria-label="Room action">
-          <button id="action-join" type="button" aria-pressed="true">Join a room</button>
-          <button id="action-create" type="button" aria-pressed="false">Create a room</button>
+          <button id="action-join" type="button" aria-pressed="true"><span aria-hidden="true">↗</span> Join a room</button>
+          <button id="action-create" type="button" aria-pressed="false"><span aria-hidden="true">＋</span> Create a room</button>
         </div>
         <form id="join-form" novalidate>
           <label for="room-id">Room ID</label><input id="room-id" required pattern="[a-fA-F0-9]{12}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="room-id-help" placeholder="a1b2c3d4e5f6">
@@ -30,22 +32,22 @@
           <label for="join-pin">Enter room PIN</label><div class="pin-control"><input id="join-pin" class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" required autocomplete="off" placeholder="••••"><span class="pin-cells" aria-hidden="true"></span></div>
           <p class="field-hint">4 DIGITS · NUMERIC</p>
           <label for="join-display-name">Your name (optional)</label><input id="join-display-name" maxlength="40" autocomplete="nickname" placeholder="Guest name">
-          <button class="primary-action" type="submit">Join room</button>
+          <button class="primary-action" type="submit">Join room <span aria-hidden="true">→</span></button>
         </form>
         <form id="create-form" hidden novalidate>
           <label for="room-name">Room name</label><input id="room-name" required maxlength="60" placeholder="Study group">
           <label for="create-pin">Choose a PIN</label><div class="pin-control"><input id="create-pin" class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" required autocomplete="new-password" placeholder="••••"><span class="pin-cells" aria-hidden="true"></span></div>
           <p class="field-hint">4 DIGITS · NUMERIC</p>
           <label for="create-display-name">Your name (optional)</label><input id="create-display-name" maxlength="40" autocomplete="nickname" placeholder="Guest name">
-          <button class="primary-action" type="submit">Create room</button>
+          <button class="primary-action" type="submit">Create room <span aria-hidden="true">→</span></button>
         </form>
       </section>
-      <ul class="trust-list" aria-label="NetDrop highlights"><li>No account needed</li><li>Live room updates</li><li>Temporary sharing</li></ul>
-      <p class="eyebrow connection-caption">CONNECT VIA THE ONLINE HTTPS SERVICE</p>
+      <ul class="trust-list" aria-label="NetDrop highlights"><li><strong>Private</strong> PIN protected</li><li><strong>Live</strong> instant updates</li><li><strong>Temporary</strong> auto-expiring</li></ul>
+      <p class="eyebrow connection-caption"><span aria-hidden="true">↗</span> ONLINE HTTPS SERVICE</p>
       <noscript>Enable JavaScript to connect to a room.</noscript>
     </section>
     <section id="room" hidden>
-      <div class="room-heading"><div><span id="mode-badge" class="badge"></span><h2 id="active-name"></h2><p>Room ID: <strong id="active-id"></strong></p></div><button id="close-room" class="danger" hidden>Close room</button><button id="leave" class="secondary">Leave room</button></div>
+      <div class="room-heading"><div><span id="mode-badge" class="badge"></span><h2 id="active-name"></h2><p>Room ID: <strong id="active-id"></strong></p></div><button id="close-room" class="danger" hidden>Close room</button><button id="leave" class="secondary">← Leave room</button></div>
       <section class="card mode-card" aria-labelledby="invite-heading">
         <h2 id="invite-heading">Invite participants</h2>
         <p id="room-mode"></p>
@@ -75,10 +77,10 @@
         <ul id="members" class="members-list" aria-label="Room members"></ul>
       </section>
       <div class="grid">
-        <form id="upload-form" class="card"><h2>Share files</h2><label for="file">Choose one or more files</label><input id="file" type="file" multiple required><p id="upload-limit"></p><button id="upload-submit">Upload files</button><ul id="upload-queue" aria-label="Upload queue"></ul></form>
-        <form id="content-form" class="card"><h2>Share text or a link</h2><label for="kind">Content type</label><select id="kind"><option value="text">Text</option><option value="link">Link</option></select><label for="content">Content</label><textarea id="content" required maxlength="10000" rows="3" placeholder="Write a note or paste a link"></textarea><button>Share</button></form>
+        <form id="upload-form" class="card share-card"><div class="card-title"><span class="feature-icon upload-icon" aria-hidden="true">↑</span><div><h2>Share files</h2><p>Upload one or more files to the room.</p></div></div><label for="file">Choose files</label><input id="file" type="file" multiple required><p id="upload-limit"></p><button id="upload-submit">Upload files <span aria-hidden="true">↑</span></button><ul id="upload-queue" aria-label="Upload queue"></ul></form>
+        <form id="content-form" class="card share-card"><div class="card-title"><span class="feature-icon note-icon" aria-hidden="true">✦</span><div><h2>Quick share</h2><p>Send a note or link to everyone here.</p></div></div><label for="kind">Content type</label><select id="kind"><option value="text">Text note</option><option value="link">Web link</option></select><label for="content">Content</label><textarea id="content" required maxlength="10000" rows="3" placeholder="Write a note or paste a link"></textarea><button>Share with room <span aria-hidden="true">→</span></button></form>
       </div>
-      <section class="card feed"><div class="room-heading"><h2>Shared content</h2><button id="refresh" class="secondary">Refresh</button></div><p id="live-status" role="status" aria-live="polite">Connecting to live updates…</p><ul id="items"></ul></section>
+      <section class="card feed"><div class="room-heading"><div><h2>Shared content</h2><p id="live-status" role="status" aria-live="polite">Connecting to live updates…</p></div><button id="refresh" class="secondary">↻ Refresh</button></div><ul id="items"></ul><nav id="feed-pagination" class="feed-pagination" aria-label="Shared-content pages" hidden><button id="feed-prev" class="secondary" type="button">← Previous</button><span id="feed-page" aria-live="polite"></span><button id="feed-next" class="secondary" type="button">Next →</button></nav></section>
     </section>
     <footer id="app-footer">Shared items expire automatically. Rooms reset when the host restarts.</footer>
   </main>
