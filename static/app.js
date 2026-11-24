@@ -12,9 +12,11 @@ let feedItems = [];
 let feedPage = 1;
 let filteredItems = [];
 let statusTimer;
+let statusSequence = 0;
 const FEED_PAGE_SIZE = 6;
 
 function setRoomAction(action) {
+  document.querySelector('.action-tabs').dataset.action = action;
   for (const choice of ['join', 'create']) {
     $(`${choice}-form`).hidden = choice !== action;
     $(`action-${choice}`).setAttribute('aria-pressed', String(choice === action));
@@ -162,10 +164,16 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function status(message, error = false) {
+  const sequence = ++statusSequence;
   clearTimeout(statusTimer);
   $('status').textContent = message;
   $('status').classList.toggle('error', error);
-  if (message && !error) statusTimer = setTimeout(() => { $('status').textContent = ''; }, 6000);
+  $('status').getAnimations().forEach(animation => animation.cancel());
+  if (message) motion($('status'), [{opacity:0, translate:'0 8px'}, {opacity:1, translate:'0 0'}]);
+  if (message && !error) statusTimer = setTimeout(async () => {
+    await motion($('status'), [{opacity:1}, {opacity:0, translate:'0 6px'}]);
+    if (sequence === statusSequence) $('status').textContent = '';
+  }, 6000);
 }
 
 async function api(path, options = {}) {
@@ -307,7 +315,7 @@ function renderFeed(room) {
       copy.className = 'secondary';
       copy.setAttribute('aria-label', `Copy ${item.kind === 'text' ? 'note' : 'link'}`);
       copy.append(icon('copy'));
-      copy.onclick = () => copyText(item.content, 'Copied to clipboard.');
+      copy.onclick = () => copyText(item.content, 'Copied to clipboard.', copy);
       row.append(copy);
     } else {
       const download = document.createElement('a');
@@ -510,6 +518,7 @@ setInterval(updateCountdowns, 1000);
 function drawUpload(task) {
   task.message.closest('li').dataset.state = task.state;
   task.message.textContent = `${task.file.name} · ${task.state}`;
+  if (task.state === 'Shared') { const check = icon('check'); check.classList.add('completion-check'); task.message.prepend(check); }
   task.progress.value = task.percent;
   task.cancel.hidden = !['Queued', 'Uploading', 'Saving…'].includes(task.state);
   task.retry.hidden = !task.retryable;
@@ -642,11 +651,18 @@ $('leave').addEventListener('click', (event) => perform(event.currentTarget, asy
   showRoom(null); status('Left room.');
 }));
 
-async function copyText(value, message) {
-  try { await navigator.clipboard.writeText(value); status(message); }
+async function copyText(value, message, button) {
+  try {
+    await navigator.clipboard.writeText(value); status(message);
+    if (button) {
+      button.replaceChildren(icon('check')); button.classList.add('copy-confirmed');
+      clearTimeout(button.copyTimer);
+      button.copyTimer = setTimeout(() => { button.replaceChildren(icon('copy')); button.classList.remove('copy-confirmed'); }, 1800);
+    }
+  }
   catch (_) { status('Clipboard access is unavailable. Select the text and copy it manually.', true); }
 }
-$('copy-room-id').onclick = () => copyText(activeRoom.id, 'Room ID copied.');
+$('copy-room-id').onclick = () => copyText(activeRoom.id, 'Room ID copied.', $('copy-room-id'));
 for (const id of ['feed-search', 'feed-filter']) {
   $(id).addEventListener(id === 'feed-search' ? 'input' : 'change', () => {
     feedPage = 1;

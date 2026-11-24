@@ -1,5 +1,7 @@
 // Small, original SVG icon set. No remote scripts or icon font requests.
 const iconPaths = {
+  check: '<path d="m5 12 4 4L19 6"/>',
+  space: '<path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6M7 12h10m-4-4 4 4-4 4"/>',
   upload: '<path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/>',
   file: '<path d="M14 2H5v20h14V7zM14 2v5h5M8 12h8m-8 4h6"/>',
   link: '<path d="m10 13 4-4m-6 7-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 10a4 4 0 0 0 6 0l4-4a4 4 0 0 0-6-6l-1 1" transform="translate(0 -1)"/>',
@@ -42,6 +44,17 @@ function setTheme(theme) {
   try { localStorage.setItem('netdrop-theme', theme); } catch (_) { /* Storage may be disabled. */ }
   document.getElementById('theme-toggle').setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`);
 }
+function motion(element, frames, duration = 180) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
+  return element.animate(frames, {duration, easing:'cubic-bezier(.2,.7,.2,1)'}).finished.catch(() => {});
+}
+async function dismissDialog(dialog) {
+  if (dialog.dataset.closing) return;
+  dialog.dataset.closing = 'true';
+  await motion(dialog, [{opacity:1, transform:'translateY(0)'}, {opacity:0, transform:'translateY(8px)'}]);
+  dialog.close();
+  delete dialog.dataset.closing;
+}
 document.addEventListener('DOMContentLoaded', () => {
   hydrateIcons();
   let theme = 'dark';
@@ -49,8 +62,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setTheme(theme === 'light' ? 'light' : 'dark');
   document.getElementById('theme-toggle').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   document.querySelectorAll('[data-dialog]').forEach(button => button.onclick = () => document.getElementById(button.dataset.dialog).showModal());
-  document.querySelectorAll('[data-dismiss]').forEach(button => button.onclick = () => button.closest('dialog').close());
-  document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('click', event => { if (event.target === dialog && (event.clientX < dialog.getBoundingClientRect().left || event.clientX > dialog.getBoundingClientRect().right || event.clientY < dialog.getBoundingClientRect().top || event.clientY > dialog.getBoundingClientRect().bottom)) dialog.close(); }));
+  document.querySelectorAll('[data-dismiss]').forEach(button => button.onclick = () => dismissDialog(button.closest('dialog')));
+  document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('cancel', event => { event.preventDefault(); dismissDialog(dialog); }));
+  document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('click', event => { if (event.target === dialog && (event.clientX < dialog.getBoundingClientRect().left || event.clientX > dialog.getBoundingClientRect().right || event.clientY < dialog.getBoundingClientRect().top || event.clientY > dialog.getBoundingClientRect().bottom)) dismissDialog(dialog); }));
   document.querySelectorAll('[data-room-action]').forEach(button => button.onclick = () => {
     setRoomAction(button.dataset.roomAction);
     document.getElementById('lobby').scrollIntoView({block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});

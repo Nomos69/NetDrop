@@ -2,22 +2,23 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#080B12"><meta name="description" content="Your devices. One shared space. Share files, notes and links in private, temporary NetDrop rooms.">
+<meta name="theme-color" content="#141414"><meta name="description" content="Your devices. One shared space. Share files, notes and links in private, temporary NetDrop rooms.">
 <title>NetDrop — Your shared space</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/premium.css?v=20261125-premium">
-<script src="/static/ui.js?v=20261125-premium" defer></script>
-<script src="/static/app.js?v=20261125-premium" defer></script>
+<link rel="stylesheet" href="/static/premium.css?v=20261125-creative">
+<link rel="stylesheet" href="/static/motion.css?v=20261125-creative">
+<script src="/static/ui.js?v=20261125-creative" defer></script>
+<script src="/static/app.js?v=20261125-creative" defer></script>
 </head>
 <body>
-<header class="site-nav"><a class="brand" href="/" aria-label="NetDrop home"><span class="brand-mark" data-icon="grid"></span>netdrop<span style="color:var(--accent)">.</span></a><div class="nav-actions"><span class="nav-note">A little less friction. A lot more flow.</span><button id="theme-toggle" class="icon-button" aria-label="Switch to light theme" data-icon="sun"></button></div></header>
+<header class="site-nav"><a class="brand" href="/" aria-label="NetDrop home"><span class="brand-mark" data-icon="space"></span>netdrop<span style="color:var(--accent)">.</span></a><div class="nav-actions"><span class="nav-note">A little less friction. A lot more flow.</span><button id="theme-toggle" class="icon-button" aria-label="Switch to light theme" data-icon="sun"></button></div></header>
 <main>
 <p id="status" role="status" aria-live="polite"></p>
 <section id="auth-shell" class="auth-shell" aria-label="Connect to NetDrop">
-<div class="hero"><p class="eyebrow">Sharing, without the friction</p><h1>Your devices.<br>One shared space.</h1><p class="hero-copy">Move files, ideas, and links between devices.<br>One private room. Any browser. No account needed.</p><div class="hero-actions"><button data-room-action="create"><span data-icon="plus"></span>Create a room</button><button class="secondary" data-room-action="join">Join a room<span data-icon="arrow"></span></button></div>
+<div class="hero"><p class="eyebrow">01 / A space between devices</p><h1>Different devices.<br><em>Same space.</em></h1><p class="hero-copy">Drop a file. Share a thought.<br>Pick it up on another device.</p><div class="hero-actions"><button data-room-action="create"><span data-icon="plus"></span>Create a room</button><button class="secondary" data-room-action="join">Join a room<span data-icon="arrow"></span></button></div>
 <div class="network" aria-label="Illustration of devices sharing through a room">
-<svg class="network-lines" viewBox="0 0 500 240" preserveAspectRatio="none" aria-hidden="true"><path d="M70 46 250 120 422 52M95 195 250 120 440 200"/><path class="signal" d="M70 46 250 120 422 52M95 195 250 120 440 200"/><circle cx="250" cy="120" r="78" stroke-dasharray="3 6"/></svg>
-<div class="network-hub" data-icon="grid"></div>
+<svg class="network-lines" viewBox="0 0 500 240" preserveAspectRatio="none" aria-hidden="true"><defs><pattern id="device-grid" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".7" fill="currentColor" stroke="none"/></pattern></defs><rect width="500" height="240" fill="url(#device-grid)" stroke="none" opacity=".2"/><path d="M70 46 250 120 422 52M95 195 250 120 440 200"/><g class="signal packet"><rect x="-6" y="-8" width="12" height="16" rx="2"/><path d="M-3 -2h6m-6 4h4"/></g><g class="packet packet-two"><rect x="-6" y="-8" width="12" height="16" rx="2"/><path d="M-3 -2h6m-6 4h4"/></g></svg>
+<div class="network-hub" data-icon="space"></div>
 <button class="network-device device-one" data-network-device="Laptop" aria-pressed="true"><span data-icon="laptop"></span>Laptop</button>
 <button class="network-device device-two" data-network-device="Phone" aria-pressed="false"><span data-icon="phone"></span>Phone</button>
 <button class="network-device device-three" data-network-device="Desktop" aria-pressed="false"><span data-icon="laptop"></span>Desktop</button>

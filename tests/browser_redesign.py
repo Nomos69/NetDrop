@@ -10,7 +10,7 @@ from playwright.sync_api import sync_playwright, expect
 
 URL = os.getenv('NETDROP_TEST_URL', 'https://localhost:18443')
 assert urlsplit(URL).hostname in {'localhost', '127.0.0.1'}, 'Local test server only'
-OUT = Path('/tmp/netdrop-ui-qa')
+OUT = Path(os.getenv('NETDROP_SCREENSHOTS', '/tmp/netdrop-ui-qa'))
 OUT.mkdir(exist_ok=True)
 
 
@@ -42,6 +42,10 @@ with sync_playwright() as p:
     a.emulate_media(reduced_motion='reduce')
     assert a.locator('.signal').evaluate("el => getComputedStyle(el).animationName") == 'none'
     a.emulate_media(reduced_motion='no-preference')
+    # Motion is real, and the reduced-motion alternative is fully static.
+    first_transform = a.locator('.packet').first.evaluate('el => getComputedStyle(el).transform')
+    a.wait_for_timeout(1100)  # Includes the intentional 600 ms pause at the device.
+    assert a.locator('.packet').first.evaluate('el => getComputedStyle(el).transform') != first_transform
     expect(a.locator('html')).to_have_attribute('data-theme', 'light')
     screenshot(a, 'landing-light-1440')
     a.reload()
@@ -50,22 +54,26 @@ with sync_playwright() as p:
     a.locator('[data-network-device="Phone"]').click()
     expect(a.locator('#network-caption')).to_contain_text('Phone')
     a.locator('[data-room-action="create"]').click()
+    expect(a.locator('.action-tabs')).to_have_attribute('data-action', 'create')
     a.locator('#room-name').fill('Design studio')
     a.locator('#create-pin').fill('12')
     a.locator('#create-form button').click()
     expect(a.locator('#auth-shell')).to_be_visible()
     a.locator('#create-pin').fill('1234')
     a.locator('#create-display-name').fill('Alex')
+    screenshot(a, 'create-room')
     a.locator('#create-form button').click()
     expect(a.locator('#room')).to_be_visible()
     expect(a.locator('#live-status')).to_have_attribute('data-state', 'connected')
     room_id = a.locator('#active-id').inner_text()
     a.locator('#copy-room-id').click()
+    expect(a.locator('#copy-room-id')).to_have_class('copy-confirmed')
     assert a.evaluate('navigator.clipboard.readText()') == room_id
     b.goto(URL + '/#room=' + room_id)
     expect(b.locator('#room-id')).to_have_value(room_id)
     b.locator('#join-pin').fill('1234')
     b.locator('#join-display-name').fill('Sam')
+    screenshot(b, 'join-room')
     b.locator('#join-form button').click()
     expect(b.locator('#room')).to_be_visible()
     expect(a.locator('#member-count')).to_contain_text('2 joined')
@@ -173,6 +181,7 @@ with sync_playwright() as p:
     no_overflow(a)
     screenshot(a, 'alerts-mobile')
     a.keyboard.press('Escape')
+    expect(a.locator('#alerts-dialog')).not_to_be_visible()
     # Unsafe-looking notes remain plain text, never executable HTML.
     b.locator('#content').fill('<img src=x onerror=alert(1)>')
     b.locator('#content-form button').click()
