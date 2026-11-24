@@ -10,6 +10,8 @@ let refreshNumber = 0;
 let busy = false;
 let feedItems = [];
 let feedPage = 1;
+let filteredItems = [];
+let statusTimer;
 const FEED_PAGE_SIZE = 6;
 
 function setRoomAction(action) {
@@ -19,7 +21,10 @@ function setRoomAction(action) {
   }
 }
 for (const action of ['join', 'create']) {
-  $(`action-${action}`).addEventListener('click', () => setRoomAction(action));
+  $(`action-${action}`).addEventListener('click', () => {
+    setRoomAction(action);
+    $(action === 'create' ? 'room-name' : 'room-id').focus();
+  });
 }
 
 function showInvitation(room) {
@@ -102,6 +107,7 @@ function connectLive() {
   stopLive();
   const room = activeRoom;
   $('live-status').textContent = 'Connecting to live updates…';
+  $('live-status').dataset.state = 'connecting';
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const socket = new WebSocket(`${protocol}//${location.host}/api/rooms/${room.id}/live`);
   liveSocket = socket;
@@ -119,6 +125,7 @@ function connectLive() {
         if (socket !== liveSocket) return;
         reconnectDelay = 1000;
         $('live-status').textContent = 'Live updates connected';
+        $('live-status').dataset.state = 'connected';
       } catch (error) {
         if (socket === liveSocket) socket.close();
       }
@@ -133,6 +140,7 @@ function connectLive() {
       return;
     }
     $('live-status').textContent = 'Connection lost. Reconnecting…';
+    $('live-status').dataset.state = 'reconnecting';
     try { await api(`/rooms/${room.id}`); }
     catch (error) {
       if (activeRoom !== room || socket !== liveSocket) return;
@@ -154,8 +162,10 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function status(message, error = false) {
+  clearTimeout(statusTimer);
   $('status').textContent = message;
   $('status').classList.toggle('error', error);
+  if (message && !error) statusTimer = setTimeout(() => { $('status').textContent = ''; }, 6000);
 }
 
 async function api(path, options = {}) {
@@ -186,6 +196,7 @@ async function perform(button, action) {
   finally {
     buttons.forEach((control) => { control.disabled = false; });
     busy = false;
+    if (activeRoom) updatePagination();
   }
 }
 
@@ -196,6 +207,10 @@ function showRoom(room) {
   activeRoom = room;
   feedPage = 1;
   feedItems = [];
+  filteredItems = [];
+  $('feed-search').value = '';
+  $('feed-filter').value = 'all';
+  document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
   $('close-room').hidden = !room?.is_owner;
   $('auth-shell').hidden = Boolean(room);
   document.body.classList.toggle('in-room', Boolean(room));
@@ -208,6 +223,7 @@ function showRoom(room) {
     sessionStorage.setItem('netdrop-room', room.id);
     reconnectDelay = 1000;
     connectLive();
+    $('items').innerHTML = '<li class="skeleton" aria-label="Loading shared content"></li><li class="skeleton" aria-hidden="true"></li>';
   } else {
     sessionStorage.removeItem('netdrop-room');
     $('items').replaceChildren();
@@ -224,34 +240,41 @@ async function refresh() {
   if (activeRoom !== room || number !== refreshNumber) return;
   maxUploadBytes = data.max_upload_bytes;
   fileTtlSeconds = data.ttl_seconds;
-  $('upload-limit').textContent = `Maximum file size: ${maxUploadBytes.toLocaleString()} bytes. Files expire after ${data.ttl_seconds / 60} minutes; notes and links remain until the room closes.`;
+  $('upload-limit').textContent = `Up to ${formatBytes(maxUploadBytes)} per file · Files expire after ${data.ttl_seconds / 60} minutes.`;
   feedItems = data.items;
   const pageCount = Math.max(1, Math.ceil(feedItems.length / FEED_PAGE_SIZE));
   feedPage = Math.min(feedPage, pageCount);
   renderFeed(room);
 }
 
-function contentIcon(kind) {
-  return kind === 'file' ? '↥' : kind === 'link' ? '↗' : '✦';
-}
-
 function renderFeed(room) {
+  const search = $('feed-search').value.trim().toLowerCase();
+  const filter = $('feed-filter').value;
+  filteredItems = feedItems.filter(item => (filter === 'all' || item.kind === filter) && (item.name || item.content || '').toLowerCase().includes(search));
+  feedPage = Math.min(feedPage, Math.max(1, Math.ceil(filteredItems.length / FEED_PAGE_SIZE)));
   const list = $('items');
+  const previousIds = new Set([...list.children].map(row => row.dataset.id));
   list.replaceChildren();
-  if (!feedItems.length) {
+  if (!filteredItems.length) {
     const item = document.createElement('li');
     item.className = 'empty-feed';
-    item.innerHTML = '<span aria-hidden="true">✦</span><strong>No shared content yet</strong><p>Upload a file, share a note, or add a link to get started.</p>';
+    item.append(icon('file'));
+    const title = document.createElement('strong');
+    title.textContent = feedItems.length ? 'No matches in this space' : 'A fresh space for your next idea.';
+    const hint = document.createElement('p');
+    hint.textContent = feedItems.length ? 'Try another search or choose a different content type.' : 'Drop a file or share a note. It will appear here for everyone.';
+    item.append(title, hint);
     list.append(item);
   }
   const start = (feedPage - 1) * FEED_PAGE_SIZE;
-  for (const item of feedItems.slice(start, start + FEED_PAGE_SIZE)) {
+  for (const item of filteredItems.slice(start, start + FEED_PAGE_SIZE)) {
     const row = document.createElement('li');
     row.className = 'feed-item';
-    const icon = document.createElement('span');
-    icon.className = `content-icon ${item.kind}`;
-    icon.textContent = contentIcon(item.kind);
-    icon.setAttribute('aria-hidden', 'true');
+    row.dataset.id = item.id;
+    if (previousIds.has(item.id)) row.style.animation = 'none';
+    const typeIcon = document.createElement('span');
+    typeIcon.className = `content-icon ${item.kind}`;
+    typeIcon.append(icon(item.kind));
     const body = document.createElement('div');
     body.className = 'feed-item-body';
     const label = document.createElement(item.kind === 'text' ? 'p' : 'a');
@@ -265,19 +288,36 @@ function renderFeed(room) {
       label.rel = 'noopener noreferrer';
     }
     const details = document.createElement('small');
-    details.textContent = `${item.kind}${item.kind === 'file' ? ` · ${item.size.toLocaleString()} bytes` : ''} · ${new Date(item.created_at).toLocaleString()}${item.kind === 'file' ? ` · Expires ${new Date(item.expires_at * 1000).toLocaleTimeString()}` : ' · Available while the room is open'}`;
+    details.textContent = `${item.kind === 'text' ? 'Note' : item.kind === 'file' ? formatBytes(item.size) : 'Link'} · ${new Date(item.created_at).toLocaleString()}${item.kind === 'file' ? '' : ' · Until room closes'}`;
     body.append(label, details);
+    row.append(typeIcon, body);
     if (item.kind === 'file') {
       const timer = document.createElement('div');
       timer.className = 'file-timer';
       timer.dataset.expires = item.expires_at;
-      timer.dataset.duration = fileTtlSeconds;
-      timer.setAttribute('role', 'status');
+      timer.dataset.duration = Math.max(1, item.expires_at - Date.parse(item.created_at) / 1000) || fileTtlSeconds;
+      timer.setAttribute('role', 'timer');
+      timer.setAttribute('aria-live', 'off');
       timer.setAttribute('aria-label', 'File expiration countdown');
       timer.innerHTML = '<svg viewBox="0 0 42 42" aria-hidden="true"><circle class="timer-track" cx="21" cy="21" r="17"></circle><circle class="timer-progress" cx="21" cy="21" r="17"></circle></svg><span class="timer-value"></span><small class="timer-label">left</small>';
       row.append(timer);
     }
-    row.append(icon, body);
+    if (item.kind !== 'file') {
+      const copy = document.createElement('button');
+      copy.className = 'secondary';
+      copy.setAttribute('aria-label', `Copy ${item.kind === 'text' ? 'note' : 'link'}`);
+      copy.append(icon('copy'));
+      copy.onclick = () => copyText(item.content, 'Copied to clipboard.');
+      row.append(copy);
+    } else {
+      const download = document.createElement('a');
+      download.href = label.href;
+      download.download = item.name;
+      download.className = 'download-action';
+      download.setAttribute('aria-label', `Download ${item.name}`);
+      download.append(icon('download'));
+      row.append(download);
+    }
     if (room.is_owner) {
       const remove = document.createElement('button');
       remove.className = 'secondary';
@@ -295,12 +335,16 @@ function renderFeed(room) {
     }
     list.append(row);
   }
-  const pageCount = Math.max(1, Math.ceil(feedItems.length / FEED_PAGE_SIZE));
-  $('feed-pagination').hidden = feedItems.length <= FEED_PAGE_SIZE;
+  updatePagination();
+  updateCountdowns();
+}
+
+function updatePagination() {
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / FEED_PAGE_SIZE));
+  $('feed-pagination').hidden = filteredItems.length <= FEED_PAGE_SIZE;
   $('feed-page').textContent = `Page ${feedPage} of ${pageCount}`;
   $('feed-prev').disabled = feedPage === 1;
   $('feed-next').disabled = feedPage === pageCount;
-  updateCountdowns();
 }
 
 let memberRefreshNumber = 0;
@@ -311,10 +355,18 @@ async function refreshMembers(room) {
   if (activeRoom !== room || number !== memberRefreshNumber) return;
   const online = data.members.filter((member) => member.online).length;
   $('member-count').textContent = `${data.members.length} joined · ${online} online`;
+  const previousMembers = [...$('members').children];
+  const existingMembers = new Set(previousMembers.map(row => row.dataset.member));
   $('members').replaceChildren();
   for (const member of data.members) {
     const row = document.createElement('li');
     row.className = 'member';
+    row.dataset.member = member.id;
+    if (existingMembers.has(member.id)) row.style.animation = 'none';
+    const avatar = document.createElement('span');
+    avatar.className = 'avatar';
+    avatar.textContent = member.name.trim().slice(0, 2).toUpperCase();
+    avatar.setAttribute('aria-hidden', 'true');
     const dot = document.createElement('span');
     dot.className = `presence-dot${member.online ? ' online' : ''}`;
     dot.setAttribute('aria-hidden', 'true');
@@ -324,7 +376,7 @@ async function refreshMembers(room) {
     const state = document.createElement('span');
     state.className = 'member-state';
     state.textContent = member.online ? 'Online' : 'Offline';
-    row.append(dot, name, state);
+    row.append(avatar, dot, name, state);
     if (room.is_owner && !member.is_you) {
       const remove = document.createElement('button');
       remove.className = 'secondary';
@@ -341,6 +393,15 @@ async function refreshMembers(room) {
       row.append(remove);
     }
     $('members').append(row);
+  }
+  const currentIds = new Set(data.members.map(member => member.id));
+  for (const row of previousMembers) {
+    if (currentIds.has(row.dataset.member) || row.classList.contains('departing')) continue;
+    row.classList.add('departing');
+    row.setAttribute('aria-hidden', 'true');
+    row.querySelectorAll('button').forEach(button => { button.disabled = true; });
+    $('members').append(row);
+    setTimeout(() => row.remove(), 180);
   }
 }
 
@@ -427,19 +488,14 @@ function clearUploads() {
   $('upload-queue').replaceChildren();
 }
 function updateCountdowns() {
-  for (const label of document.querySelectorAll('[data-expires]')) {
-    const seconds = Math.max(0, Math.ceil(Number(label.dataset.expires) - Date.now() / 1000));
-    label.textContent = seconds ? `Expires in ${Math.floor(seconds / 60)}m ${seconds % 60}s` : 'Expired · awaiting cleanup';
-  }
   for (const timer of document.querySelectorAll('.file-timer')) {
     const seconds = Math.max(0, Math.ceil(Number(timer.dataset.expires) - Date.now() / 1000));
     const duration = Math.max(1, Number(timer.dataset.duration) || fileTtlSeconds);
     const progress = Math.min(1, seconds / duration);
     const ring = timer.querySelector('.timer-progress');
     ring.style.strokeDashoffset = String(107 * (1 - progress));
-    timer.querySelector('.timer-value').textContent = seconds >= 60
-      ? `${Math.floor(seconds / 60)}m`
-      : `${seconds}s`;
+    timer.querySelector('.timer-value').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+    timer.querySelector('.timer-label').textContent = seconds ? 'left' : 'expired';
     timer.classList.toggle('warning', seconds > 0 && seconds <= Math.min(300, duration * .2));
     timer.classList.toggle('expired', seconds === 0);
     timer.setAttribute('aria-label', seconds ? `${seconds} seconds until this file expires` : 'This file has expired');
@@ -452,6 +508,7 @@ function updateCountdowns() {
 setInterval(updateCountdowns, 1000);
 
 function drawUpload(task) {
+  task.message.closest('li').dataset.state = task.state;
   task.message.textContent = `${task.file.name} · ${task.state}`;
   task.progress.value = task.percent;
   task.cancel.hidden = !['Queued', 'Uploading', 'Saving…'].includes(task.state);
@@ -559,6 +616,7 @@ $('content-form').addEventListener('submit', (event) => {
   perform(event.submitter, async () => {
     await api(`/rooms/${activeRoom.id}/items`, json({ kind: $('kind').value, content: $('content').value }));
     $('content').value = '';
+    $('content').dispatchEvent(new Event('input'));
     await refresh();
     status('Content shared.');
   });
@@ -573,15 +631,76 @@ $('feed-prev').addEventListener('click', () => {
   renderFeed(activeRoom);
 });
 $('feed-next').addEventListener('click', () => {
-  const pageCount = Math.ceil(feedItems.length / FEED_PAGE_SIZE);
+  const pageCount = Math.ceil(filteredItems.length / FEED_PAGE_SIZE);
   if (!activeRoom || feedPage >= pageCount) return;
   feedPage += 1;
   renderFeed(activeRoom);
 });
 $('leave').addEventListener('click', (event) => perform(event.currentTarget, async () => {
+  if (!confirm('Leave this room? You can rejoin with the room ID and PIN.')) return;
   await api(`/rooms/${activeRoom.id}/leave`, { method: 'POST' });
   showRoom(null); status('Left room.');
 }));
+
+async function copyText(value, message) {
+  try { await navigator.clipboard.writeText(value); status(message); }
+  catch (_) { status('Clipboard access is unavailable. Select the text and copy it manually.', true); }
+}
+$('copy-room-id').onclick = () => copyText(activeRoom.id, 'Room ID copied.');
+for (const id of ['feed-search', 'feed-filter']) {
+  $(id).addEventListener(id === 'feed-search' ? 'input' : 'change', () => {
+    feedPage = 1;
+    if (activeRoom) renderFeed(activeRoom);
+  });
+}
+$('content').addEventListener('input', () => {
+  const value = $('content').value;
+  $('character-count').textContent = `${value.length.toLocaleString()} / 10,000 · Ctrl/⌘ + Enter`;
+  if (/^https?:\/\/\S+$/i.test(value.trim())) $('kind').value = 'link';
+  else if (!value) $('kind').value = 'text';
+});
+$('content').addEventListener('keydown', event => {
+  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !busy) {
+    event.preventDefault();
+    $('content-form').requestSubmit();
+  }
+});
+let previewUrls = [];
+function showSelectedFiles() {
+  previewUrls.forEach(url => URL.revokeObjectURL(url));
+  previewUrls = [];
+  $('upload-selection').replaceChildren();
+  const files = [...$('file').files];
+  for (const file of files.slice(0, 4)) {
+    // Preview only locally selected raster images. Remote downloads trigger email
+    // alerts, so do not fetch room files automatically for thumbnails.
+    if (['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(file); previewUrls.push(img.src);
+      img.alt = `Selected image: ${file.name}`;
+      $('upload-selection').append(img);
+    }
+  }
+  if (files.length) {
+    const count = document.createElement('small');
+    count.textContent = `${files.length} file${files.length === 1 ? '' : 's'} selected · ${formatBytes(files.reduce((sum, file) => sum + file.size, 0))}`;
+    $('upload-selection').append(count);
+  }
+}
+$('file').addEventListener('change', showSelectedFiles);
+$('upload-form').addEventListener('reset', () => setTimeout(showSelectedFiles, 0));
+for (const type of ['dragenter', 'dragover']) $('drop-zone').addEventListener(type, event => {
+  event.preventDefault(); $('drop-zone').classList.add('dragging');
+});
+for (const type of ['dragleave', 'drop']) $('drop-zone').addEventListener(type, event => {
+  event.preventDefault(); $('drop-zone').classList.remove('dragging');
+});
+$('drop-zone').addEventListener('drop', event => {
+  if (event.dataTransfer.files.length) {
+    $('file').files = event.dataTransfer.files;
+    showSelectedFiles();
+  }
+});
 
 (async () => {
   const parameters = new URLSearchParams(location.hash.slice(1));

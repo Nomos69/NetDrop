@@ -1,88 +1,58 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#182033">
-  <meta name="description" content="Share temporary files, text, and links securely with NetDrop.">
-  <title>NetDrop — File &amp; Clipboard Sharing</title>
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=20261125-ui">
-  <script src="/static/app.js?v=20261125-timer" defer></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#080B12"><meta name="description" content="Your devices. One shared space. Share files, notes and links in private, temporary NetDrop rooms.">
+<title>NetDrop — Your shared space</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/premium.css?v=20261125-premium">
+<script src="/static/ui.js?v=20261125-premium" defer></script>
+<script src="/static/app.js?v=20261125-premium" defer></script>
 </head>
 <body>
-  <main>
-    <p id="status" role="status" aria-live="polite"></p>
-    <section id="auth-shell" class="auth-shell" aria-label="NetDrop connection">
-      <header class="brand-header">
-        <img class="brand-logo" src="/static/logo.svg" width="52" height="52" alt="">
-        <div><p class="product-label">NETDROP</p><h1>Share in a private room.</h1></div>
-      </header>
-      <div class="online-notice"><span aria-hidden="true"></span><p>Secure online sharing · No account required</p></div>
-      <p class="brand-note">Create a temporary room or join one with a room ID and PIN. Files, notes, and links update live for everyone inside.</p>
-      <section id="lobby">
-        <div class="lobby-heading"><p class="eyebrow">YOUR ROOM</p><p>Choose how you want to begin.</p></div>
-        <div class="action-tabs" role="group" aria-label="Room action">
-          <button id="action-join" type="button" aria-pressed="true"><span aria-hidden="true">↗</span> Join a room</button>
-          <button id="action-create" type="button" aria-pressed="false"><span aria-hidden="true">＋</span> Create a room</button>
-        </div>
-        <form id="join-form" novalidate>
-          <label for="room-id">Room ID</label><input id="room-id" required pattern="[a-fA-F0-9]{12}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="room-id-help" placeholder="a1b2c3d4e5f6">
-          <p id="room-id-help">12-character room ID · 0–9 and a–f</p>
-          <label for="join-pin">Enter room PIN</label><div class="pin-control"><input id="join-pin" class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" required autocomplete="off" placeholder="••••"><span class="pin-cells" aria-hidden="true"></span></div>
-          <p class="field-hint">4 DIGITS · NUMERIC</p>
-          <label for="join-display-name">Your name (optional)</label><input id="join-display-name" maxlength="40" autocomplete="nickname" placeholder="Guest name">
-          <button class="primary-action" type="submit">Join room <span aria-hidden="true">→</span></button>
-        </form>
-        <form id="create-form" hidden novalidate>
-          <label for="room-name">Room name</label><input id="room-name" required maxlength="60" placeholder="Study group">
-          <label for="create-pin">Choose a PIN</label><div class="pin-control"><input id="create-pin" class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" required autocomplete="new-password" placeholder="••••"><span class="pin-cells" aria-hidden="true"></span></div>
-          <p class="field-hint">4 DIGITS · NUMERIC</p>
-          <label for="create-display-name">Your name (optional)</label><input id="create-display-name" maxlength="40" autocomplete="nickname" placeholder="Guest name">
-          <button class="primary-action" type="submit">Create room <span aria-hidden="true">→</span></button>
-        </form>
-      </section>
-      <ul class="trust-list" aria-label="NetDrop highlights"><li><strong>Private</strong> PIN protected</li><li><strong>Live</strong> instant updates</li><li><strong>Temporary</strong> auto-expiring</li></ul>
-      <p class="eyebrow connection-caption"><span aria-hidden="true">↗</span> ONLINE HTTPS SERVICE</p>
-      <noscript>Enable JavaScript to connect to a room.</noscript>
-    </section>
-    <section id="room" hidden>
-      <div class="room-heading"><div><span id="mode-badge" class="badge"></span><h2 id="active-name"></h2><p>Room ID: <strong id="active-id"></strong></p></div><button id="close-room" class="danger" hidden>Close room</button><button id="leave" class="secondary">← Leave room</button></div>
-      <section class="card mode-card" aria-labelledby="invite-heading">
-        <h2 id="invite-heading">Invite participants</h2>
-        <p id="room-mode"></p>
-        <label for="invite-link">Room invitation link</label><input id="invite-link" readonly>
-        <button id="copy-invite" type="button" class="secondary">Copy invitation link</button>
-        <details id="qr-invite"><summary>Show invitation QR code</summary><img id="invite-qr" width="220" height="220" alt="QR code for this room invitation"><p>Scan to open the invitation, then enter the PIN. The same network requirements apply.</p></details>
-        <p id="invite-help">Share the PIN separately. Opening this link still requires the room PIN.</p>
-        <form id="email-invitation" hidden>
-          <h2>Email a room invitation</h2>
-          <p>Send an expiring join link. It never contains the room PIN; share that separately. Email requires internet access on the host.</p>
-          <label for="invite-email">Recipient email</label><input id="invite-email" type="email" maxlength="254" required autocomplete="off">
-          <button type="submit">Email invitation</button>
-          <p id="email-result" role="status" aria-live="polite"></p>
-        </form>
-        <form id="upload-alerts">
-          <h2>File activity alerts</h2>
-          <p>Get an optional email whenever a file is uploaded or downloaded. Each alert includes the filename and file attachment, but never the room PIN.</p>
-          <label for="alert-email">Your email</label><input id="alert-email" type="email" maxlength="254" required autocomplete="email">
-          <button type="submit">Enable file alerts</button>
-          <button id="disable-alerts" type="button" class="secondary">Disable alerts</button>
-          <p id="alert-result" role="status" aria-live="polite"></p>
-        </form>
-      </section>
-      <section class="card members-card" aria-labelledby="members-heading">
-        <div class="room-heading"><h2 id="members-heading">Room members</h2><span id="member-count" role="status" aria-live="polite"></span></div>
-        <p>Names are chosen by participants. Online means their live connection is active; closing a tab may take a moment to appear.</p>
-        <ul id="members" class="members-list" aria-label="Room members"></ul>
-      </section>
-      <div class="grid">
-        <form id="upload-form" class="card share-card"><div class="card-title"><span class="feature-icon upload-icon" aria-hidden="true">↑</span><div><h2>Share files</h2><p>Upload one or more files to the room.</p></div></div><label for="file">Choose files</label><input id="file" type="file" multiple required><p id="upload-limit"></p><button id="upload-submit">Upload files <span aria-hidden="true">↑</span></button><ul id="upload-queue" aria-label="Upload queue"></ul></form>
-        <form id="content-form" class="card share-card"><div class="card-title"><span class="feature-icon note-icon" aria-hidden="true">✦</span><div><h2>Quick share</h2><p>Send a note or link to everyone here.</p></div></div><label for="kind">Content type</label><select id="kind"><option value="text">Text note</option><option value="link">Web link</option></select><label for="content">Content</label><textarea id="content" required maxlength="10000" rows="3" placeholder="Write a note or paste a link"></textarea><button>Share with room <span aria-hidden="true">→</span></button></form>
-      </div>
-      <section class="card feed"><div class="room-heading"><div><h2>Shared content</h2><p id="live-status" role="status" aria-live="polite">Connecting to live updates…</p></div><button id="refresh" class="secondary">↻ Refresh</button></div><ul id="items"></ul><nav id="feed-pagination" class="feed-pagination" aria-label="Shared-content pages" hidden><button id="feed-prev" class="secondary" type="button">← Previous</button><span id="feed-page" aria-live="polite"></span><button id="feed-next" class="secondary" type="button">Next →</button></nav></section>
-    </section>
-    <footer id="app-footer">Shared items expire automatically. Rooms reset when the host restarts.</footer>
-  </main>
-</body>
-</html>
+<header class="site-nav"><a class="brand" href="/" aria-label="NetDrop home"><span class="brand-mark" data-icon="grid"></span>netdrop<span style="color:var(--accent)">.</span></a><div class="nav-actions"><span class="nav-note">A little less friction. A lot more flow.</span><button id="theme-toggle" class="icon-button" aria-label="Switch to light theme" data-icon="sun"></button></div></header>
+<main>
+<p id="status" role="status" aria-live="polite"></p>
+<section id="auth-shell" class="auth-shell" aria-label="Connect to NetDrop">
+<div class="hero"><p class="eyebrow">Sharing, without the friction</p><h1>Your devices.<br>One shared space.</h1><p class="hero-copy">Move files, ideas, and links between devices.<br>One private room. Any browser. No account needed.</p><div class="hero-actions"><button data-room-action="create"><span data-icon="plus"></span>Create a room</button><button class="secondary" data-room-action="join">Join a room<span data-icon="arrow"></span></button></div>
+<div class="network" aria-label="Illustration of devices sharing through a room">
+<svg class="network-lines" viewBox="0 0 500 240" preserveAspectRatio="none" aria-hidden="true"><path d="M70 46 250 120 422 52M95 195 250 120 440 200"/><path class="signal" d="M70 46 250 120 422 52M95 195 250 120 440 200"/><circle cx="250" cy="120" r="78" stroke-dasharray="3 6"/></svg>
+<div class="network-hub" data-icon="grid"></div>
+<button class="network-device device-one" data-network-device="Laptop" aria-pressed="true"><span data-icon="laptop"></span>Laptop</button>
+<button class="network-device device-two" data-network-device="Phone" aria-pressed="false"><span data-icon="phone"></span>Phone</button>
+<button class="network-device device-three" data-network-device="Desktop" aria-pressed="false"><span data-icon="laptop"></span>Desktop</button>
+<button class="network-device device-four" data-network-device="Tablet" aria-pressed="false"><span data-icon="phone"></span>Tablet</button>
+</div><p id="network-caption">Laptop · Share through your browser</p>
+<ul class="trust-list"><li><span data-icon="shield"></span>PIN protected</li><li><span data-icon="clock"></span>Temporary by design</li><li><span data-icon="users"></span>Live updates</li></ul></div>
+<section id="lobby" class="entry-panel" aria-labelledby="entry-title"><p class="eyebrow">YOUR NEXT SHARED SPACE</p><h2 id="entry-title">Make the connection.</h2><p class="entry-intro">A room for the things you want to share.</p>
+<div class="action-tabs" role="group" aria-label="Room action"><button id="action-join" type="button" aria-pressed="true">Join a room</button><button id="action-create" type="button" aria-pressed="false">Create a room</button></div>
+<form id="join-form" novalidate>
+<label for="room-id">Room ID</label><input id="room-id" required pattern="[a-fA-F0-9]{12}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="room-id-help" placeholder="e.g. a1b2c3d4e5f6"><p id="room-id-help">The 12-character code shared by your host.</p>
+<label for="join-pin">Room PIN</label><div class="pin-control"><input id="join-pin" class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" required autocomplete="off" aria-describedby="join-pin-help"><span class="pin-cells" aria-hidden="true"></span></div><p id="join-pin-help" class="field-hint">4 digits. Ask your host for the PIN.</p>
+<label for="join-display-name">Your name <span style="color:var(--muted)">(optional)</span></label><input id="join-display-name" maxlength="40" autocomplete="nickname" placeholder="How others will see you">
+<button class="primary-action" type="submit">Join room<span data-icon="arrow"></span></button></form>
+<form id="create-form" hidden novalidate>
+<label for="room-name">Room name</label><input id="room-name" required maxlength="60" placeholder="e.g. Design studio">
+<label for="create-pin">Choose a PIN</label><div class="pin-control"><input id="create-pin" class="pin-entry" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" required autocomplete="new-password" aria-describedby="create-pin-help"><span class="pin-cells" aria-hidden="true"></span></div><p id="create-pin-help" class="field-hint">4 digits. Share this separately from your invitation.</p>
+<label for="create-display-name">Your name <span style="color:var(--muted)">(optional)</span></label><input id="create-display-name" maxlength="40" autocomplete="nickname" placeholder="How others will see you">
+<button class="primary-action" type="submit">Create room<span data-icon="arrow"></span></button></form>
+<p class="form-footer">No sign-up. Just a room ID and a PIN.</p><noscript>Enable JavaScript to create or join a room.</noscript></section>
+</section>
+<section id="room" hidden class="workspace">
+<nav class="workspace-nav" aria-label="Workspace"><p class="eyebrow">WORKSPACE</p><a href="#shared-feed" class="selected"><span data-icon="grid"></span>Overview</a><a href="#upload-form"><span data-icon="upload"></span>Share files</a><a href="#content-form"><span data-icon="text"></span>Clipboard</a><button data-dialog="invite-dialog"><span data-icon="users"></span>Invitations</button><button data-dialog="alerts-dialog"><span data-icon="mail"></span>Email alerts</button><div class="sidebar-foot"><span data-icon="shield"></span><p>Private by invitation.<br>Temporary by design.</p></div></nav>
+<div class="workspace-main">
+<div class="room-heading workspace-header"><div><p class="eyebrow">SHARED SPACE <span id="mode-badge" class="badge"> / ONLINE</span></p><h2 id="active-name"></h2><div class="room-id-line">Room ID <strong id="active-id"></strong><button id="copy-room-id" type="button" aria-label="Copy room ID" data-icon="copy"></button></div></div><div class="workspace-header-actions"><button data-dialog="invite-dialog"><span data-icon="plus"></span>Invite people</button><button id="leave" class="secondary"><span data-icon="logout"></span>Leave</button></div></div>
+<div class="grid">
+<form id="upload-form" class="card share-card"><div class="card-title"><span class="feature-icon" data-icon="upload"></span><div><h2>Drop something here.</h2><p>Files for everyone in this room.</p></div></div>
+<div id="drop-zone" class="drop-zone"><span data-icon="upload"></span><label for="file">Drag files here, or browse</label><p>Choose one file or a whole batch</p><input id="file" type="file" multiple required aria-describedby="upload-limit"></div><div id="upload-selection" class="upload-selection" aria-live="polite"></div><p id="upload-limit"></p><button id="upload-submit"><span data-icon="upload"></span>Upload files</button><ul id="upload-queue" aria-label="Upload queue"></ul></form>
+<form id="content-form" class="card share-card"><div class="card-title"><span class="feature-icon" data-icon="text"></span><div><h2>From your clipboard.</h2><p>A thought, a snippet, or your next great link.</p></div></div><div class="editor-toolbar"><label for="content">Quick share</label><label class="sr-only" for="kind">Content type</label><select id="kind"><option value="text">Text note</option><option value="link">Web link</option></select></div><textarea id="content" required maxlength="10000" rows="5" placeholder="Paste a link or write something worth sharing…"></textarea><div class="editor-footer"><small id="character-count">0 / 10,000 · Ctrl/⌘ + Enter</small><button>Share<span data-icon="arrow"></span></button></div></form>
+</div>
+<section id="shared-feed" class="card feed"><div class="room-heading"><div><h2>In this space</h2><p id="live-status" role="status" aria-live="polite">Connecting to live updates…</p></div><button id="refresh" class="icon-button" aria-label="Refresh shared content" data-icon="refresh"></button></div><div class="feed-tools"><label><span class="sr-only">Search shared content</span><input id="feed-search" type="search" placeholder="Search files, notes, and links…"></label><label class="sr-only" for="feed-filter">Filter content type</label><select id="feed-filter"><option value="all">All items</option><option value="file">Files</option><option value="text">Notes</option><option value="link">Links</option></select></div><ul id="items" aria-label="Shared content"></ul><nav id="feed-pagination" class="feed-pagination" aria-label="Shared-content pages" hidden><button id="feed-prev" class="secondary" type="button">Previous</button><span id="feed-page" aria-live="polite"></span><button id="feed-next" class="secondary" type="button">Next</button></nav></section>
+<section class="card members-card" aria-labelledby="members-heading"><div class="room-heading"><h2 id="members-heading">People in this space</h2><span id="member-count" role="status" aria-live="polite"></span></div><p>Names are chosen by participants. Presence reflects their live connection.</p><ul id="members" class="members-list" aria-label="Room members"></ul></section>
+</div></section>
+<footer id="app-footer"><span>netdrop. &nbsp; A shared space, without the friction.</span><span>Temporary files · Rooms reset when the service restarts</span></footer>
+</main>
+<dialog id="invite-dialog" aria-labelledby="invite-heading"><div class="dialog-heading"><h2 id="invite-heading">Bring people together.</h2><button class="icon-button" data-dismiss aria-label="Close invitations" data-icon="close"></button></div><p id="room-mode"></p><label for="invite-link">Invitation link</label><input id="invite-link" readonly><button id="copy-invite" type="button" class="secondary"><span data-icon="copy"></span>Copy invitation link</button><p id="invite-help" style="margin-top:12px">Share the PIN separately.</p><details id="qr-invite"><summary>Show invitation QR code</summary><img id="invite-qr" width="220" height="220" alt="Room invitation QR code"><p>Scan to open this room, then enter the PIN.</p></details>
+<form id="email-invitation" hidden><h3>Email an invitation</h3><p>Send an expiring invitation link. Share the PIN separately.</p><label for="invite-email">Recipient email</label><input id="invite-email" type="email" maxlength="254" required autocomplete="off"><button type="submit"><span data-icon="mail"></span>Send invitation</button><p id="email-result" role="status" aria-live="polite"></p></form><hr style="border:0;border-top:1px solid var(--border);margin:24px 0"><button id="close-room" class="danger" hidden>Close room for everyone</button></dialog>
+<dialog id="alerts-dialog" aria-labelledby="alerts-heading"><div class="dialog-heading"><h2 id="alerts-heading">Keep an eye on activity.</h2><button class="icon-button" data-dismiss aria-label="Close email settings" data-icon="close"></button></div><p>Optional email alerts for file uploads and downloads.</p><p class="disclosure">Each alert sends the filename and a copy of the file as an email attachment outside this room. Enable alerts only for an email address you control.</p><form id="upload-alerts"><label for="alert-email">Your email</label><input id="alert-email" type="email" maxlength="254" required autocomplete="email"><button type="submit">Enable file alerts</button><button id="disable-alerts" type="button" class="secondary">Disable alerts</button><p id="alert-result" role="status" aria-live="polite"></p></form></dialog>
+</body></html>
