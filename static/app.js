@@ -6,18 +6,6 @@ let reconnectTimer = null;
 let heartbeatTimer = null;
 let reconnectDelay = 1000;
 let refreshNumber = 0;
-// Keep navigation available even if an older server lacks /api/sharing.
-function browserMode() {
-  const host = location.hostname;
-  const privateHost = host === 'localhost' || host.endsWith('.local') || host.endsWith('.lan')
-    || host.endsWith('.localhost') || host === '[::1]'
-    || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(host);
-  return location.protocol === 'https:' && !privateHost ? 'online' : 'local';
-}
-let sharingConfig = { mode: browserMode(), local_url: '', online_url: '', local_installer_url: '' };
-let selectedMode = sharingConfig.mode;
-let modeChosen = false;
-let settingsFailed = false;
 let busy = false;
 
 function setRoomAction(action) {
@@ -30,126 +18,20 @@ for (const action of ['join', 'create']) {
   $(`action-${action}`).addEventListener('click', () => setRoomAction(action));
 }
 
-function updateMode() {
-  const current = selectedMode === sharingConfig.mode;
-  for (const mode of ['local', 'online']) {
-    $(`mode-${mode}`).setAttribute('aria-pressed', String(selectedMode === mode));
-    $(`mode-${mode}`).disabled = busy;
-  }
-  $('mode-badge').textContent = sharingConfig.mode === 'local' ? 'LOCAL NETWORK' : 'ONLINE';
-  const showLocalInstaller = selectedMode === 'local' && !current;
-  $('local-install').hidden = !showLocalInstaller;
-  $('server-form').hidden = current || showLocalInstaller;
-  $('lobby').hidden = Boolean(activeRoom) || !current;
-  $('local-rooms').hidden = Boolean(activeRoom) || !current || sharingConfig.mode !== 'local';
-  $('retry-settings').hidden = !settingsFailed;
-  $('mode-help').textContent = current
-    ? (selectedMode === 'local' ? 'Share on the same Wi-Fi or LAN. No internet needed.' : 'Share across different networks through this HTTPS server.')
-    : (selectedMode === 'online' ? 'Connect to an online host using its HTTPS address or invitation link.' : 'Download NetDrop Local to create or scan rooms on this Wi-Fi network.');
-  $('server-label').textContent = selectedMode === 'online' ? 'Or paste invite link' : 'Local host or invite link';
-  $('server-help').textContent = selectedMode === 'online'
-    ? 'Paste the host’s HTTPS server address or room invitation link. Internet required.'
-    : 'Use the host’s LAN address, for example http://192.168.1.12:8000.';
-  $('switch-mode').textContent = `Connect to ${selectedMode === 'online' ? 'online' : 'local'} server`;
-  $('connection-caption').textContent = selectedMode === 'online' ? 'CONNECT VIA AN HTTPS HOST' : 'DEVICES MUST BE ON THE SAME NETWORK';
-}
-
-async function scanLocalRooms() {
-  if (sharingConfig.mode !== 'local' || activeRoom) return;
-  const result = await api('/rooms/discover');
-  const list = $('local-room-list');
-  list.replaceChildren();
-  for (const room of result.rooms) {
-    const item = document.createElement('li');
-    item.className = 'local-room';
-    const details = document.createElement('span');
-    const name = document.createElement('span');
-    name.className = 'local-room-name';
-    name.textContent = room.name;
-    const id = document.createElement('span');
-    id.className = 'local-room-id';
-    id.textContent = `Room ID: ${room.id}`;
-    details.append(name, id);
-    const join = document.createElement('button');
-    join.type = 'button';
-    join.className = 'secondary';
-    join.textContent = 'Join room';
-    join.addEventListener('click', () => {
-      $('room-id').value = room.id;
-      setRoomAction('join');
-      $('join-pin').focus();
-    });
-    item.append(details, join);
-    list.append(item);
-  }
-  $('local-room-empty').hidden = result.rooms.length > 0;
-}
-$('scan-local-rooms').addEventListener('click', () => scanLocalRooms().catch((error) => status(error.message, true)));
-
-for (const mode of ['local', 'online']) {
-  $(`mode-${mode}`).addEventListener('click', () => {
-    modeChosen = true;
-    selectedMode = mode;
-    $('server-link').value = sharingConfig[`${mode}_url`] || '';
-    $('server-link').setCustomValidity('');
-    updateMode();
-  });
-}
-$('server-link').addEventListener('input', () => $('server-link').setCustomValidity(''));
-$('server-form').addEventListener('submit', (event) => {
-  event.preventDefault();
-  const input = $('server-link');
-  try {
-    const target = new URL(input.value.trim());
-    if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password
-        || target.pathname !== '/' || target.search || (selectedMode === 'online' && target.protocol !== 'https:')) {
-      throw new Error('Invalid server link');
-    }
-    location.assign(target.href);
-  } catch (error) {
-    input.setCustomValidity(selectedMode === 'online'
-      ? 'Enter a complete HTTPS server address or invitation link, such as https://your-host.example/#room=…'
-      : 'Enter a complete local host address, such as http://192.168.1.12:8000.');
-    input.reportValidity();
-  }
-});
-
-async function loadSharingSettings() {
-  try {
-    const data = await api('/sharing');
-    if (!['local', 'online'].includes(data.mode)) throw new Error('Invalid settings');
-    sharingConfig = data;
-    if (data.local_installer_url) $('local-installer').href = data.local_installer_url;
-    if (!modeChosen) selectedMode = data.mode;
-    if (!$('server-link').value) $('server-link').value = data[`${selectedMode}_url`] || '';
-    settingsFailed = false;
-    status('');
-  } catch (error) {
-    settingsFailed = true;
-    status('Connection settings are unavailable. You can still choose a mode and paste the host’s invite link. Restart or update the server, then retry.', true);
-  }
-  updateMode();
-  scanLocalRooms().catch(() => {});
-}
-$('retry-settings').addEventListener('click', loadSharingSettings);
-
 function showInvitation(room) {
   $('email-invitation').hidden = !room.is_owner;
   $('email-invitation').reset();
   $('email-result').textContent = '';
-  const base = sharingConfig[`${room.mode}_url`] || location.origin;
-  const link = new URL(base);
+  const link = new URL(location.origin);
   // A fragment keeps the room ID out of server access logs. PINs are never included.
   link.hash = `room=${room.id}`;
   $('invite-link').value = link.href;
   $('invite-qr').src = `/api/rooms/${room.id}/invitation.svg`;
   $('qr-invite').open = false;
-  $('room-mode').textContent = room.mode === 'online'
-    ? 'Online room · Internet required · Share with people on any network.'
-    : 'Local room · Participants must be on the same Wi-Fi / LAN.';
+  $('room-mode').textContent = 'Online room · Internet required · Share with people on any network.';
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(link.hostname);
   $('invite-help').textContent = loopback
-    ? `This address works only on this computer. Configure ${room.mode === 'online' ? 'the public HTTPS address' : 'the host’s LAN address'} before sharing the link with another device. Share the PIN separately.`
+    ? 'This address works only on this computer. Configure the public HTTPS address before sharing the link with another device. Share the PIN separately.'
     : 'Share the PIN separately. Opening this link still requires the room PIN.';
 }
 
@@ -300,7 +182,6 @@ async function perform(button, action) {
   finally {
     buttons.forEach((control) => { control.disabled = false; });
     busy = false;
-    updateMode();
   }
 }
 
@@ -318,17 +199,14 @@ function showRoom(room) {
     $('active-id').textContent = room.id;
     $('room-mode').dataset.expires = room.expires_at;
     showInvitation(room);
-    $('sharing-options').hidden = true;
     sessionStorage.setItem('netdrop-room', room.id);
     reconnectDelay = 1000;
     connectLive();
   } else {
-    $('sharing-options').hidden = false;
     sessionStorage.removeItem('netdrop-room');
     $('items').replaceChildren();
     $('members').replaceChildren();
     $('member-count').textContent = '';
-    updateMode();
   }
 }
 
@@ -482,10 +360,6 @@ for (const id of ['room-id', 'join-pin', 'create-pin']) {
 for (const action of ['create', 'join']) {
   $(`${action}-form`).addEventListener('submit', (event) => {
     event.preventDefault();
-    if (selectedMode !== sharingConfig.mode) {
-      status('Open the selected sharing server first.', true);
-      return;
-    }
     if (!validateRoomForm(action)) return;
     perform(event.submitter, async () => {
       const path = action === 'create' ? '/rooms' : `/rooms/${$('room-id').value.trim().toLowerCase()}/join`;
@@ -496,7 +370,6 @@ for (const action of ['create', 'join']) {
       renderPin($(`${action}-pin`));
       showRoom(room);
       await refresh();
-      scanLocalRooms().catch(() => {});
       status(`Joined ${room.name}.`);
     });
   });
@@ -521,7 +394,7 @@ function updateCountdowns() {
   }
   if (activeRoom?.expires_at) {
     const seconds = Math.max(0, Math.ceil(Number(activeRoom.expires_at) - Date.now() / 1000));
-    $('room-mode').textContent = `${activeRoom.mode === 'online' ? 'Online room' : 'Local room'} · Room expires in ${Math.floor(seconds / 86400)}d ${Math.floor(seconds % 86400 / 3600)}h`;
+    $('room-mode').textContent = `Online room · Room expires in ${Math.floor(seconds / 86400)}d ${Math.floor(seconds % 86400 / 3600)}h`;
   }
 }
 setInterval(updateCountdowns, 1000);
@@ -647,9 +520,7 @@ $('leave').addEventListener('click', (event) => perform(event.currentTarget, asy
   showRoom(null); status('Left room.');
 }));
 
-updateMode();
 (async () => {
-  await loadSharingSettings();
   const parameters = new URLSearchParams(location.hash.slice(1));
   const invitation = parameters.get('room');
   const invitationToken = parameters.get('invite');

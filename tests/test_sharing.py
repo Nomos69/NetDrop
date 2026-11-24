@@ -20,8 +20,8 @@ class SharingTests(unittest.TestCase):
         self.patch = patch.object(config, 'UPLOAD_DIR', Path(self.storage.name))
         self.patch.start()
         self.addCleanup(self.patch.stop)
-        self.owner = self.enterContext(TestClient(app))
-        self.guest = self.enterContext(TestClient(app))
+        self.owner = self.enterContext(TestClient(app, base_url='https://netdrop.example'))
+        self.guest = self.enterContext(TestClient(app, base_url='https://netdrop.example'))
         self.headers = {'X-NetDrop': '1'}
         response = self.owner.post('/api/rooms', json={'name': 'Study group', 'pin': '1234'}, headers=self.headers)
         self.assertEqual(response.status_code, 201)
@@ -116,13 +116,11 @@ class SharingTests(unittest.TestCase):
         for path in ['/', '/static/styles.css', '/static/app.js']:
             self.assertEqual(self.owner.get(path).status_code, 200)
 
-    def test_local_room_discovery_lists_active_rooms_without_pin(self):
-        response = self.guest.get('/api/rooms/discover')
+    def test_online_sharing_configuration_is_exposed(self):
+        response = self.guest.get('/api/sharing')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['rooms'], [{
-            'id': self.room, 'name': 'Study group', 'expires_at': rooms.rooms[self.room]['expires_at']
-        }])
-        self.assertNotIn('pin', str(response.json()).lower())
+        self.assertEqual(response.json()['mode'], 'online')
+        self.assertIn('online_url', response.json())
 
 
 if __name__ == '__main__':

@@ -7,8 +7,8 @@
   <meta name="description" content="Share temporary files, text, and links securely with NetDrop.">
   <title>NetDrop — File &amp; Clipboard Sharing</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/styles.css?v=20261120c">
-  <script src="/static/app.js?v=20261120c" defer></script>
+  <link rel="stylesheet" href="/static/styles.css?v=20261124-online">
+  <script src="/static/app.js?v=20261124-online" defer></script>
 </head>
 <body>
   <main>
@@ -19,42 +19,11 @@
         <div><h1>NETDROP</h1><p class="eyebrow">FILE &amp; CLIPBOARD SHARING</p></div>
       </header>
       <p class="brand-note">A private, temporary room for files, links, and notes.</p>
-      <section id="sharing-options" aria-labelledby="sharing-heading">
-        <h2 id="sharing-heading" class="eyebrow">CONNECTION MODE</h2>
-        <div class="mode-tabs" role="group" aria-label="Connection mode">
-          <button id="mode-local" type="button" aria-pressed="true">Local Network</button>
-          <button id="mode-online" type="button" aria-pressed="false">Online</button>
-        </div>
-        <p id="mode-help" class="connection-help" role="status">Share on the same Wi-Fi or LAN.</p>
-        <section id="local-install" class="local-install" hidden aria-labelledby="local-install-heading">
-          <h3 id="local-install-heading">Use Local Network</h3>
-          <p>Install NetDrop Local on each Windows device. Rooms, users, and files stay on the same Wi-Fi network.</p>
-          <a id="local-installer" class="installer-button" href="https://github.com/Nomos69/NetDrop/releases/latest/download/NetDrop-Local-Setup.exe">Download NetDrop Local for Windows</a>
-          <ol>
-            <li>Install and open NetDrop Local.</li>
-            <li>The host chooses <strong>Host a local room</strong> and creates a room.</li>
-            <li>Others choose <strong>Scan local rooms</strong>, select the host, then enter the room PIN.</li>
-          </ol>
-          <p class="installer-note">Local rooms and files are not sent to the Online server.</p>
-        </section>
-        <form id="server-form" hidden novalidate>
-          <label id="server-label" for="server-link">Or paste invite link</label>
-          <input id="server-link" type="url" placeholder="https://netdrop.example/#room=…" autocomplete="url" aria-describedby="server-help">
-          <p id="server-help">Enter the host’s HTTPS server address or room invitation link.</p>
-          <button id="switch-mode" type="submit">Connect to online server</button>
-        </form>
-        <button id="retry-settings" class="text-button" type="button" hidden>Retry connection settings</button>
-      </section>
       <section id="lobby">
         <div class="action-tabs" role="group" aria-label="Room action">
           <button id="action-join" type="button" aria-pressed="true">Join a room</button>
           <button id="action-create" type="button" aria-pressed="false">Create a room</button>
         </div>
-        <section id="local-rooms" class="local-rooms" hidden aria-labelledby="local-rooms-heading">
-          <div class="room-heading"><div><h2 id="local-rooms-heading">Available local rooms</h2><p>Rooms on this NetDrop host. Select one, then enter its PIN.</p></div><button id="scan-local-rooms" class="secondary" type="button">Scan rooms</button></div>
-          <ul id="local-room-list" aria-live="polite"></ul>
-          <p id="local-room-empty" class="field-hint">No rooms available yet.</p>
-        </section>
         <form id="join-form" novalidate>
           <label for="room-id">Room ID</label><input id="room-id" required pattern="[a-fA-F0-9]{12}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="room-id-help" placeholder="a1b2c3d4e5f6">
           <p id="room-id-help">12-character room ID · 0–9 and a–f</p>
@@ -72,7 +41,7 @@
         </form>
       </section>
       <ul class="trust-list" aria-label="NetDrop highlights"><li>No account needed</li><li>Live room updates</li><li>Temporary sharing</li></ul>
-      <p id="connection-caption" class="eyebrow connection-caption">DEVICES MUST BE ON THE SAME NETWORK</p>
+      <p class="eyebrow connection-caption">CONNECT VIA THE ONLINE HTTPS SERVICE</p>
       <noscript>Enable JavaScript to connect to a room.</noscript>
     </section>
     <section id="room" hidden>

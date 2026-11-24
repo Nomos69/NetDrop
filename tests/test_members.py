@@ -14,8 +14,8 @@ class MemberTests(unittest.TestCase):
         rooms.sessions.clear()
         rooms.attempts.clear()
         realtime.connections.clear()
-        self.owner = self.enterContext(TestClient(app))
-        self.guest = self.enterContext(TestClient(app))
+        self.owner = self.enterContext(TestClient(app, base_url='https://netdrop.example'))
+        self.guest = self.enterContext(TestClient(app, base_url='https://netdrop.example'))
         self.headers = {"X-NetDrop": "1"}
         result = self.owner.post("/api/rooms", headers=self.headers,
                                  json={"name": "Members", "pin": "1234", "display_name": "Rhimar"})
@@ -55,7 +55,7 @@ class MemberTests(unittest.TestCase):
         self.assertEqual(len(self.members()), 1)
 
     def test_live_join_tabs_disconnect_and_leave(self):
-        headers = {"origin": "http://testserver"}
+        headers = {"origin": "https://netdrop.example"}
         with self.owner.websocket_connect(self.base + "/live", headers=headers) as owner_ws:
             self.assertEqual(owner_ws.receive_json()["type"], "ready")
             self.assertTrue(self.members()[0]["online"])

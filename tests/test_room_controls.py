@@ -22,8 +22,8 @@ class RoomControlTests(unittest.TestCase):
         realtime.connections.clear()
         self.storage = self.enterContext(tempfile.TemporaryDirectory())
         self.enterContext(patch.object(config, 'UPLOAD_DIR', Path(self.storage)))
-        self.owner = self.enterContext(TestClient(app))
-        self.guest = self.enterContext(TestClient(app))
+        self.owner = self.enterContext(TestClient(app, base_url='https://netdrop.example'))
+        self.guest = self.enterContext(TestClient(app, base_url='https://netdrop.example'))
         self.headers = {'X-NetDrop': '1'}
         result = self.owner.post('/api/rooms', json={'name': 'Controls', 'pin': '1234'}, headers=self.headers)
         self.assertTrue(result.json()['is_owner'])
@@ -61,7 +61,7 @@ class RoomControlTests(unittest.TestCase):
     def test_removal_revokes_live_socket_and_is_room_scoped(self):
         other = self.guest.post('/api/rooms', json={'name': 'Other', 'pin': '5678'}, headers=self.headers).json()['id']
         member = rooms.sessions[self.guest.cookies.get(rooms.COOKIE)]['member_id']
-        with self.guest.websocket_connect(self.base + '/live', headers={'origin': 'http://testserver'}) as ws:
+        with self.guest.websocket_connect(self.base + '/live', headers={'origin': 'https://netdrop.example'}) as ws:
             ws.receive_json()
             self.owner.delete(self.base + '/members/' + member, headers=self.headers)
             with self.assertRaises(WebSocketDisconnect):
@@ -113,12 +113,12 @@ class RoomControlTests(unittest.TestCase):
         self.assertNotIn(self.room_id, rooms.rooms)
 
     def test_qr_is_private_and_encodes_pin_free_invitation(self):
-        with patch.object(config, 'LOCAL_URL', 'http://192.168.1.5:8000'), patch('app.rooms.qrcode.make', wraps=rooms.qrcode.make) as make:
+        with patch.object(config, 'ONLINE_URL', 'https://netdrop.example'), patch('app.rooms.qrcode.make', wraps=rooms.qrcode.make) as make:
             response = self.owner.get(self.base + '/invitation.svg')
             self.assertEqual(response.status_code, 200)
             self.assertIn('image/svg+xml', response.headers['content-type'])
             self.assertIn(b'<svg', response.content)
             self.assertEqual(make.call_args.args[0], 'http://192.168.1.5:8000/#room=' + self.room_id)
             self.assertNotIn('1234', make.call_args.args[0])
-        with TestClient(app) as stranger:
+        with TestClient(app, base_url='https://netdrop.example') as stranger:
             self.assertEqual(stranger.get(self.base + '/invitation.svg').status_code, 403)

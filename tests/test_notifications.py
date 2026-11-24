@@ -13,13 +13,13 @@ from app.main import app
 class NotificationTests(unittest.TestCase):
     def setUp(self):
         rooms.rooms.clear(); rooms.sessions.clear(); rooms.attempts.clear()
-        self.client = self.enterContext(TestClient(app))
+        self.client = self.enterContext(TestClient(app, base_url='https://netdrop.example'))
         self.headers = {"X-NetDrop": "1"}
         self.room = self.client.post("/api/rooms", headers=self.headers,
                                      json={"name": "Study", "pin": "1234"}).json()["id"]
         self.base = f"/api/rooms/{self.room}"
         for key, value in [("BREVO_API_KEY", "test-secret"), ("BREVO_SENDER_EMAIL", "host@example.com"),
-                           ("LOCAL_URL", "http://192.168.1.5:8000")]:
+                           ("ONLINE_URL", "https://netdrop.example")]:
             self.enterContext(patch.object(config, key, value))
         self.post = self.enterContext(patch("app.notifications.httpx.AsyncClient.post", new_callable=AsyncMock))
         self.post.return_value = httpx.Response(201, json={"messageId": "test"})
@@ -40,7 +40,7 @@ class NotificationTests(unittest.TestCase):
                                           json={"token": "x" * 24}).status_code, 403)
 
     def test_only_owner_sends_invitation(self):
-        with TestClient(app) as guest:
+        with TestClient(app, base_url='https://netdrop.example') as guest:
             guest.post(self.base + "/join", headers=self.headers, json={"pin": "1234"})
             self.assertEqual(guest.post(self.base + "/email-invitation", headers=self.headers,
                                         json={"email": "guest@example.com"}).status_code, 403)

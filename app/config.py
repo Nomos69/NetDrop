@@ -1,7 +1,6 @@
 """Settings loaded from the project .env file or environment variables."""
 
 import os
-import ipaddress
 import sys
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -47,24 +46,16 @@ BREVO_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "NetDrop").strip() or "NetDro
 
 CLEANUP_INTERVAL_SECONDS = positive_integer("NETDROP_CLEANUP_INTERVAL_SECONDS", 5)
 
-# Each server owns its rooms. Switching mode opens the corresponding server.
-SHARING_MODE = os.getenv("NETDROP_SHARING_MODE", "local").strip().lower()
-if SHARING_MODE not in {"local", "online"}:
-    raise ValueError("NETDROP_SHARING_MODE must be local or online")
-
-LOCAL_DISCOVERY = os.getenv("NETDROP_LOCAL_DISCOVERY", "1").strip().lower() in {"1", "true", "yes"}
-
-
-def server_url(name, online=False):
+def server_url(name):
     value = os.getenv(name, "").strip().rstrip("/")
     if not value:
         return ""
     parsed = urlsplit(value)
     if (any(character.isspace() for character in value) or "\\" in value
-            or parsed.scheme not in ({"https"} if online else {"http", "https"})
+            or parsed.scheme != "https"
             or not parsed.hostname or parsed.username or parsed.password
             or parsed.path or parsed.query or parsed.fragment):
-        raise ValueError(f"{name} must be a {'HTTPS' if online else 'HTTP(S)'} origin without a path or credentials")
+        raise ValueError(f"{name} must be an HTTPS origin without a path or credentials")
     try:
         parsed.port
     except ValueError as error:
@@ -72,23 +63,6 @@ def server_url(name, online=False):
     return value
 
 
-LOCAL_URL = server_url("NETDROP_LOCAL_URL")
-ONLINE_URL = server_url("NETDROP_ONLINE_URL", online=True)
-if SHARING_MODE == "online" and not ONLINE_URL:
-    raise ValueError("Online mode requires NETDROP_ONLINE_URL with the public HTTPS address")
-LOCAL_INSTALLER_URL = os.getenv(
-    "NETDROP_LOCAL_INSTALLER_URL",
-    "https://github.com/Nomos69/NetDrop/releases/latest/download/NetDrop-Local-Setup.exe",
-).strip()
-if not LOCAL_INSTALLER_URL.startswith("https://"):
-    raise ValueError("NETDROP_LOCAL_INSTALLER_URL must use HTTPS")
-
-
-def sharing_mode(request):
-    """Public HTTPS deployments work even before optional addresses are set."""
-    hostname = request.url.hostname or ""
-    try:
-        public_host = ipaddress.ip_address(hostname).is_global
-    except ValueError:
-        public_host = hostname != "localhost" and "." in hostname and not hostname.endswith((".local", ".lan", ".localhost"))
-    return "online" if request.url.scheme == "https" and public_host else SHARING_MODE
+ONLINE_URL = server_url("NETDROP_ONLINE_URL")
+if not ONLINE_URL:
+    raise ValueError("NETDROP_ONLINE_URL is required and must be the public HTTPS address")

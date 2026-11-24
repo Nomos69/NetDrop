@@ -23,11 +23,11 @@ class LiveExpiryTests(unittest.TestCase):
         realtime.connections.clear()
         self.storage = self.enterContext(tempfile.TemporaryDirectory())
         self.enterContext(patch.object(config, 'UPLOAD_DIR', Path(self.storage)))
-        self.client = self.enterContext(TestClient(app))
+        self.client = self.enterContext(TestClient(app, base_url='https://netdrop.example'))
         self.headers = {'X-NetDrop': '1'}
         self.room_id = self.client.post('/api/rooms', json={'name': 'Live room', 'pin': '1234'}, headers=self.headers).json()['id']
         self.base = f'/api/rooms/{self.room_id}'
-        self.ws_headers = {'origin': 'http://testserver'}
+        self.ws_headers = {'origin': 'https://netdrop.example'}
 
     def upload(self):
         result = self.client.post(self.base + '/files', content=b'file bytes', headers={**self.headers, 'X-Filename': 'test.txt'})
@@ -52,7 +52,7 @@ class LiveExpiryTests(unittest.TestCase):
             with self.assertRaises(WebSocketDisconnect):
                 with self.client.websocket_connect(path, headers=headers):
                     pass
-        with TestClient(app) as stranger:
+        with TestClient(app, base_url='https://netdrop.example') as stranger:
             with self.assertRaises(WebSocketDisconnect):
                 with stranger.websocket_connect(self.base + '/live', headers=self.ws_headers):
                     pass

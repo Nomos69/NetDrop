@@ -27,7 +27,7 @@ def authorized(socket, room_id):
 async def room_updates(socket: WebSocket, room_id: str):
     origin = urlsplit(socket.headers.get('origin', ''))
     expected_scheme = 'https' if socket.url.scheme == 'wss' else 'http'
-    if ((config.SHARING_MODE == 'online' and socket.url.scheme != 'wss')
+    if (socket.url.scheme != 'wss'
             or origin.scheme != expected_scheme or origin.netloc != socket.headers.get('host')
             or not authorized(socket, room_id)):
         await socket.close(code=1008)

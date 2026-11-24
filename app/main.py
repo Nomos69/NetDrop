@@ -9,7 +9,6 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import config, files, notifications, realtime, rooms
-from app.local_discovery import LocalAdvertiser
 
 
 @asynccontextmanager
@@ -17,14 +16,9 @@ async def lifespan(app: FastAPI):
     config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     files.cleanup_once()
     cleanup = asyncio.create_task(files.cleanup_loop())
-    advertiser = LocalAdvertiser(config.PORT) if config.SHARING_MODE == "local" and config.LOCAL_DISCOVERY else None
-    if advertiser is not None:
-        advertiser.start()
     try:
         yield
     finally:
-        if advertiser is not None:
-            advertiser.stop()
         cleanup.cancel()
         with suppress(asyncio.CancelledError):
             await cleanup
@@ -40,7 +34,7 @@ class OnlineHTTPS:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if (scope["type"] == "http" and config.SHARING_MODE == "online"
+        if (scope["type"] == "http"
                 and scope["scheme"] != "https" and scope["path"] != "/up"):
             response = JSONResponse({"detail": "Online sharing requires HTTPS."}, status_code=403)
             await response(scope, receive, send)
@@ -53,10 +47,7 @@ app.add_middleware(OnlineHTTPS)
 
 @app.get("/api/sharing")
 async def sharing(request: Request):
-    mode = config.sharing_mode(request)
-    return {"mode": mode, "local_url": config.LOCAL_URL,
-            "online_url": config.ONLINE_URL or (str(request.base_url).rstrip("/") if mode == "online" else ""),
-            "local_installer_url": config.LOCAL_INSTALLER_URL}
+    return {"mode": "online", "online_url": config.ONLINE_URL}
 
 
 app.include_router(rooms.router)

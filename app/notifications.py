@@ -1,4 +1,4 @@
-"""Optional Brevo invitations and file activity alerts; delivery never blocks LAN sharing."""
+"""Optional Brevo invitations and file activity alerts."""
 
 import asyncio
 import base64
@@ -37,7 +37,7 @@ def enabled():
 
 
 def origin_for(request):
-    return config.ONLINE_URL if config.sharing_mode(request) == "online" else config.LOCAL_URL
+    return config.ONLINE_URL
 
 
 def fingerprint(email):
@@ -76,7 +76,7 @@ async def send_email(payload, event_id):
 
 
 def queue_upload_alerts(room, item):
-    """Fire-and-forget after local commit; failure never changes upload success."""
+    """Fire-and-forget after a successful commit; failure never changes upload success."""
     queue_file_alerts(room, item, "upload")
 
 
@@ -145,8 +145,7 @@ async def email_invitation(body: Invitation, request: Request, room=Depends(room
                  "expires_at": time.time() + config.INVITATION_TTL_SECONDS}
     link = f"{origin}/#room={room['id']}&invite={token}"
     text = (f'You are invited to NetDrop room: {room["name"]}\nJoin: {link}\n\n'
-            'This invitation expires. It does not grant room access: ask the owner for the PIN separately. '
-            'For a local room, join the same Wi-Fi or LAN as the host.')
+            'This invitation expires. It does not grant room access: ask the owner for the PIN separately.')
     accepted = await send_email({"sender": {"email": config.BREVO_SENDER_EMAIL, "name": config.BREVO_SENDER_NAME},
                                  "to": [{"email": body.email}], "subject": "Your NetDrop room invitation",
                                  "textContent": text, "htmlContent": "<html><body><pre>" + escape(text) + "</pre></body></html>",
