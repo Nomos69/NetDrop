@@ -1,0 +1,18 @@
+.local-demo-actions { display: grid; gap: 10px; margin: 24px 0; }
+.local-demo-actions button { justify-content: flex-start; min-height: 54px; }
+.local-demo-actions button > :last-child { margin-left: auto; }
+.demo-preview { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border: 1px solid var(--border); background: var(--bg); border-radius: 10px; padding: 16px; margin: 20px 0; font-size: 12px; }
+.demo-preview .badge { margin-left: auto; font-size: 9px; }
+.demo-preview .icon { color: var(--accent); }
+.demo-room-choice { display: flex; width: 100%; gap: 14px; padding: 18px; text-align: left; margin: 24px 0 12px; }
+.demo-room-choice > span:nth-child(2) { flex: 1; }
+.demo-room-choice small, .demo-item small { display: block; font-size: 10px; margin-top: 5px; color: var(--muted); }
+.demo-navigation { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 18px; border-top: 1px solid var(--border); }
+.demo-navigation button { font-size: 11px; }
+.local-sharing-demo .demo-caption { margin: 24px 0 16px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.demo-item { display: flex; gap: 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.demo-item > span { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.demo-item button { font-size: 11px; flex-shrink: 0; }
+#demo-feedback, #demo-scan-status { font-size: 12px; margin-top: 14px; color: var(--accent); }
+#demo-note-form { margin-bottom: 24px; }
+#demo-note-form button { margin-top: 10px; }

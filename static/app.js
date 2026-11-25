@@ -32,9 +32,12 @@ for (const action of ['join', 'create']) {
 function showLocalSharingDemo(open) {
   $('online-lobby').hidden = open;
   $('local-sharing-demo').hidden = !open;
+  $('lobby').setAttribute('aria-label', open ? 'Local Sharing demonstration' : 'Connect to NetDrop');
+  if (open) $('lobby').removeAttribute('aria-labelledby');
+  else $('lobby').setAttribute('aria-labelledby', 'entry-title');
   if (open) {
     history.replaceState(null, '', '#local-sharing-demo');
-    $('back-to-online').focus();
+    $('local-sharing-demo').querySelector('button')?.focus();
   } else if (location.hash === '#local-sharing-demo') {
     history.replaceState(null, '', location.pathname + location.search);
     $('local-sharing-link').focus();
