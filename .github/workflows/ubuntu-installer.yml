@@ -1,0 +1,42 @@
+name: Build and publish Ubuntu installer
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/ubuntu-installer.yml
+      - app/**
+      - packaging/**
+      - requirements*.txt
+      - static/**
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-venv python3-tk
+      - name: Build Ubuntu package
+        env:
+          NETDROP_PACKAGE_VERSION: ${{ github.event.release.tag_name }}
+        run: bash packaging/build-linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NetDrop-Local-Ubuntu
+          path: dist/installer/NetDrop-Local-Ubuntu.deb
+      - name: Attach package to GitHub Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" dist/installer/NetDrop-Local-Ubuntu.deb --clobber

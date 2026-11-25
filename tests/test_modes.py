@@ -31,6 +31,7 @@ class ModeTests(unittest.TestCase):
             self.assertEqual(sharing["mode"], "local")
             self.assertEqual(sharing["local_url"], "http://192.168.1.12:8000")
             self.assertTrue(sharing["local_installer_url"].startswith("https://"))
+            self.assertTrue(sharing["ubuntu_installer_url"].endswith(".deb"))
 
             room = client.post("/api/rooms", headers=self.headers,
                                json={"name": "Local", "pin": "1234"}).json()
@@ -143,6 +144,18 @@ class ModeTests(unittest.TestCase):
             self.assertEqual(config.server_url("TEST_MODE_URL", online=True), "https://example.com")
         with patch.dict("os.environ", {"TEST_MODE_URL": "http://192.168.1.12:8000"}):
             self.assertEqual(config.server_url("TEST_MODE_URL"), "http://192.168.1.12:8000")
+
+    def test_invalid_download_urls(self):
+        for value in ["http://example.com/file.deb", "https://user:secret@example.com/file.deb",
+                      "https://example.com:bad/file.deb", "https://bad host/file.deb"]:
+            with self.subTest(value=value), patch.dict("os.environ", {"TEST_DOWNLOAD_URL": value}):
+                with self.assertRaises(ValueError):
+                    config.https_download_url("TEST_DOWNLOAD_URL", "https://example.com/file.deb")
+        with patch.dict("os.environ", {"TEST_DOWNLOAD_URL": "https://example.com/package.deb"}):
+            self.assertEqual(
+                config.https_download_url("TEST_DOWNLOAD_URL", "https://example.com/file.deb"),
+                "https://example.com/package.deb",
+            )
 
     def test_lan_hostname_validation(self):
         with patch.dict("os.environ", {"TEST_LAN_HOSTNAME": "netdrop"}):

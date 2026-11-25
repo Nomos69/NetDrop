@@ -1,2 +1,0 @@
-# Build-only dependency for the Windows Local companion.
-pyinstaller>=6.0,<7

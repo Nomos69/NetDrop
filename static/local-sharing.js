@@ -47,20 +47,25 @@
             link.textContent = 'Open the LAN address';
             actions.append(link);
           } else {
-            note.textContent += ' On Windows, use ipconfig to find the host PC’s Wi-Fi IPv4 address.';
+            note.textContent += ' To join from another device, use the host computer’s Wi-Fi or LAN IPv4 address, not 127.0.0.1.';
           }
         }
       } else {
         heading.textContent = 'Share without the internet.';
         description.textContent =
-          'Install NetDrop Local on a Windows computer to host rooms for nearby devices.';
+          'Install NetDrop Local on Windows or Ubuntu to host rooms for nearby devices.';
         note.textContent =
-          'After installation, choose “Host a local room”. Other devices can join over the same Wi-Fi or LAN.';
-        const link = document.createElement('a');
-        link.className = 'local-download';
-        link.href = settings.local_installer_url;
-        link.textContent = 'Download NetDrop Local for Windows';
-        actions.append(link);
+          'Choose “Host a local room” after installation. The Ubuntu download is for 64-bit systems. Other devices must use the same Wi-Fi or LAN.';
+        for (const [url, label] of [
+          [settings.local_installer_url, 'Download NetDrop Local for Windows'],
+          [settings.ubuntu_installer_url, 'Download NetDrop Local for Ubuntu (.deb)'],
+        ]) {
+          const link = document.createElement('a');
+          link.className = 'local-download';
+          link.href = url;
+          link.textContent = label;
+          actions.append(link);
+        }
       }
 
       if (!root.hidden) heading.focus({ preventScroll: true });

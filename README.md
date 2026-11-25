@@ -7,8 +7,9 @@
 ## About
 
 NetDrop offers two ways to share. Online rooms use a public HTTPS service and
-work across networks. Local rooms run on a Windows host and share over the same
-Wi-Fi or LAN without sending room content through the online service.
+work across networks. Local rooms run on a Windows or Ubuntu host and share
+over the same Wi-Fi or LAN without sending room content through the online
+service.
 
 ## Features
 
@@ -17,7 +18,7 @@ Wi-Fi or LAN without sending room content through the online service.
 - Live member and content updates over secure WebSockets
 - Copyable invitation links and SVG QR invitations
 - Owner controls, automatic expiry, and optional Brevo email invitations
-- Optional Windows local companion for LAN hosting and host discovery
+- Optional Windows and Ubuntu companions for LAN hosting and host discovery
 
 ## Deploy and run
 
@@ -51,15 +52,17 @@ WebSockets. Open the public `https://` URL in the browser.
 ## Local sharing
 
 On the online NetDrop page, choose **Local Sharing** to download the Windows
-companion. Install it, choose **Host a local room**, then use the updated
-NetDrop room interface to create a room. Participants must be on the same
-Wi-Fi or LAN and can join with the room ID and PIN. If automatic host discovery
-is unavailable, open the host's LAN address directly.
+or Ubuntu companion. Install it, choose **Host a local room**, then use the
+updated NetDrop room interface to create a room. Participants must be on the
+same Wi-Fi or LAN and can join with the room ID and PIN. If automatic host
+discovery is unavailable, open the host's LAN address directly.
 
 The companion sets local mode for its own server process; users do not need to
 edit `.env` or run Python. The local server stores temporary uploads under the
 user's NetDrop data directory. Local sharing uses HTTP on the LAN, so use a
 trusted private network.
+The Ubuntu package does not change firewall settings. If UFW is enabled, allow
+the app's LAN traffic only on a trusted network.
 
 To build the Windows installer locally, install Python 3.12+ and Inno Setup 6,
 then run this from PowerShell:
@@ -74,6 +77,19 @@ website's download link works after the release workflow succeeds. A manually
 dispatched workflow also makes the installer available as a downloadable
 workflow artifact.
 
+To build the Ubuntu 64-bit package, use Ubuntu 24.04 or later with Python 3,
+`python3-venv`, `python3-tk`, and `dpkg-deb` installed:
+
+```bash
+bash packaging/build-linux.sh
+sudo apt install ./dist/installer/NetDrop-Local-Ubuntu.deb
+```
+
+The package adds NetDrop Local to the applications menu. Remove it with
+`sudo apt remove netdrop-local`. Publishing a GitHub Release builds and attaches
+the `.deb` as `NetDrop-Local-Ubuntu.deb`; the online Local Sharing panel links
+to the latest release asset.
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -86,6 +102,7 @@ workflow artifact.
 | `NETDROP_LOCAL_DISCOVERY` | `1` | Enable local mDNS discovery |
 | `NETDROP_LAN_HOSTNAME` | system hostname | Optional single-label mDNS name |
 | `NETDROP_LOCAL_INSTALLER_URL` | latest Windows release asset | HTTPS download URL shown in Local Sharing |
+| `NETDROP_UBUNTU_INSTALLER_URL` | latest Ubuntu release asset | HTTPS download URL shown in Local Sharing |
 | `NETDROP_FILE_TTL_SECONDS` | `1800` | Uploaded-file lifetime |
 | `NETDROP_MAX_UPLOAD_BYTES` | `50000000` | Maximum bytes per uploaded file |
 | `NETDROP_CLEANUP_INTERVAL_SECONDS` | `5` | Expiry-cleanup interval |

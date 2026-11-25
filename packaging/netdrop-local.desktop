@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=NetDrop Local
+Comment=Host file and clipboard sharing on your local network
+Exec=netdrop-local
+TryExec=netdrop-local
+Icon=netdrop-local
+Terminal=false
+Type=Application
+Categories=Network;FileTransfer;

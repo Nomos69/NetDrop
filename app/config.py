@@ -91,19 +91,28 @@ ONLINE_URL = server_url("NETDROP_ONLINE_URL", online=True)
 if SHARING_MODE == "online" and not ONLINE_URL:
     raise ValueError("Online mode requires NETDROP_ONLINE_URL with the public HTTPS address")
 
-LOCAL_INSTALLER_URL = os.getenv(
+def https_download_url(name, default):
+    value = os.getenv(name, default).strip()
+    parsed = urlsplit(value)
+    if (any(character.isspace() for character in value) or "\\" in value
+            or parsed.scheme != "https" or not parsed.hostname
+            or parsed.username or parsed.password):
+        raise ValueError(f"{name} must be an HTTPS URL")
+    try:
+        parsed.port
+    except ValueError as error:
+        raise ValueError(f"{name} has an invalid port") from error
+    return value
+
+
+LOCAL_INSTALLER_URL = https_download_url(
     "NETDROP_LOCAL_INSTALLER_URL",
     "https://github.com/Nomos69/NetDrop/releases/latest/download/NetDrop-Local-Setup.exe",
-).strip()
-installer_url = urlsplit(LOCAL_INSTALLER_URL)
-if (any(character.isspace() for character in LOCAL_INSTALLER_URL)
-        or "\\" in LOCAL_INSTALLER_URL or installer_url.scheme != "https"
-        or not installer_url.hostname or installer_url.username or installer_url.password):
-    raise ValueError("NETDROP_LOCAL_INSTALLER_URL must be an HTTPS URL")
-try:
-    installer_url.port
-except ValueError as error:
-    raise ValueError("NETDROP_LOCAL_INSTALLER_URL has an invalid port") from error
+)
+UBUNTU_INSTALLER_URL = https_download_url(
+    "NETDROP_UBUNTU_INSTALLER_URL",
+    "https://github.com/Nomos69/NetDrop/releases/latest/download/NetDrop-Local-Ubuntu.deb",
+)
 
 
 def sharing_mode(request):

@@ -16,7 +16,7 @@ py -3 -m venv .build-venv
 Assert-NativeCommandSuccess 'Creating the build environment'
 & .\.build-venv\Scripts\python.exe -m pip install --upgrade pip
 Assert-NativeCommandSuccess 'Upgrading pip'
-& .\.build-venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-windows.txt
+& .\.build-venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-packaging.txt
 Assert-NativeCommandSuccess 'Installing build requirements'
 & .\.build-venv\Scripts\pyinstaller.exe --noconfirm --clean packaging\NetDropLocal.spec
 Assert-NativeCommandSuccess 'Building the NetDrop Local application'

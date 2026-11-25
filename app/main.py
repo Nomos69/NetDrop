@@ -61,6 +61,7 @@ async def sharing(request: Request):
         "local_url": config.local_origin(request) if mode == "local" else "",
         "online_url": config.ONLINE_URL or (str(request.base_url).rstrip("/") if mode == "online" else ""),
         "local_installer_url": config.LOCAL_INSTALLER_URL,
+        "ubuntu_installer_url": config.UBUNTU_INSTALLER_URL,
     }
 
 
