@@ -461,7 +461,9 @@ function renderPin(input) {
     cells.append(cell);
   }
 }
-for (const input of document.querySelectorAll('.pin-entry')) {
+function initializePin(input) {
+  if (input.dataset.pinInitialized) return;
+  input.dataset.pinInitialized = 'true';
   for (const event of ['input', 'change', 'focus', 'keyup', 'select']) {
     input.addEventListener(event, () => renderPin(input));
   }
@@ -479,6 +481,7 @@ for (const input of document.querySelectorAll('.pin-entry')) {
   });
   renderPin(input);
 }
+document.querySelectorAll('.pin-entry').forEach(initializePin);
 
 for (const id of ['room-id', 'join-pin', 'create-pin']) {
   $(id).addEventListener('input', () => $(id).setCustomValidity(''));

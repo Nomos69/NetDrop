@@ -28,6 +28,18 @@
     };
     root.innerHTML = `<p class="eyebrow">LOCAL SHARING</p>${screens[view]}<p id="local-feedback" role="status" aria-live="polite"></p><div class="demo-navigation">${view !== 'home' ? `<button class="secondary" data-local="${view === 'room' ? 'leave' : 'home'}">${view === 'room' ? 'Leave room' : '← Back'}</button>` : ''}<button class="secondary" data-local="exit">Back to online sharing</button></div>`;
     hydrateIcons(root);
+    for (const input of root.querySelectorAll('input[type="password"]')) {
+      const control = document.createElement('div');
+      control.className = 'pin-control';
+      input.before(control);
+      input.classList.add('pin-entry');
+      input.minLength = 4;
+      const cells = document.createElement('span');
+      cells.className = 'pin-cells';
+      cells.setAttribute('aria-hidden', 'true');
+      control.append(input, cells);
+      initializePin(input);
+    }
     const heading = root.querySelector('h2'); heading.tabIndex = -1; if (!root.hidden) heading.focus({preventScroll:true});
     el('local-host')?.addEventListener('submit', event => { event.preventDefault(); run(async () => {
       const name = el('local-name').value.trim(); if (!name) throw Error('Enter a room name.');
