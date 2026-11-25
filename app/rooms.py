@@ -84,9 +84,27 @@ def grant(room_id, request, response, display_name=""):
 
 
 def public_room(room, request, session=None):
-    return {"id": room["id"], "name": room["name"], "mode": "online",
+    mode = config.sharing_mode(request)
+    return {"id": room["id"], "name": room["name"], "mode": mode,
+            "local_url": config.local_origin(request) if mode == "local" else "",
             "is_owner": (session or session_for(request))["member_id"] == room.get("owner_id"),
             "expires_at": room["expires_at"]}
+
+
+@router.get("/rooms/discover")
+async def discover_rooms(request: Request):
+    """Expose active room names only on the local server; PINs stay private."""
+    if config.sharing_mode(request) != "local":
+        raise HTTPException(404, "Local room discovery is unavailable on an online server.")
+    from app.files import cleanup_once
+    cleanup_once()
+    now = time.time()
+    available = [
+        {"id": room["id"], "name": room["name"], "expires_at": room["expires_at"]}
+        for room in rooms.values()
+        if not room.get("closed") and room["expires_at"] > now
+    ]
+    return {"rooms": sorted(available, key=lambda room: room["name"].lower())}
 
 
 @router.post("/rooms", status_code=201, dependencies=[Depends(browser_write)])
@@ -191,6 +209,8 @@ async def remove_member(member_id: str, room=Depends(owner_only)):
 
 @router.get("/rooms/{room_id}/invitation.svg")
 async def invitation_qr(request: Request, room=Depends(authorize)):
-    image = qrcode.make(config.ONLINE_URL + "/#room=" + room["id"], image_factory=qrcode.image.svg.SvgPathImage)
+    mode = config.sharing_mode(request)
+    origin = config.ONLINE_URL if mode == "online" else config.local_origin(request)
+    image = qrcode.make(origin + "/#room=" + room["id"], image_factory=qrcode.image.svg.SvgPathImage)
     return Response(image.to_string(), media_type="image/svg+xml",
                     headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})

@@ -1,15 +1,14 @@
 <div align="center">
   <img src="static/logo.svg" width="88" alt="NetDrop logo">
   <h1>NetDrop</h1>
-  <p><strong>Temporary online file and clipboard sharing.</strong></p>
+  <p><strong>Temporary online and local-network file and clipboard sharing.</strong></p>
 </div>
 
 ## About
 
-NetDrop is an HTTPS-only browser-based sharing app. Create a PIN-protected,
-temporary room, invite participants from any network, and share files, text,
-and links in real time. Local-network transfer, LAN discovery, and the Windows
-local companion have been removed.
+NetDrop offers two ways to share. Online rooms use a public HTTPS service and
+work across networks. Local rooms run on a Windows host and share over the same
+Wi-Fi or LAN without sending room content through the online service.
 
 ## Features
 
@@ -18,6 +17,7 @@ local companion have been removed.
 - Live member and content updates over secure WebSockets
 - Copyable invitation links and SVG QR invitations
 - Owner controls, automatic expiry, and optional Brevo email invitations
+- Optional Windows local companion for LAN hosting and host discovery
 
 ## Deploy and run
 
@@ -45,8 +45,34 @@ Then start the app behind HTTPS:
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
 ```
 
-The application rejects ordinary HTTP requests (except `/up`) and rejects
-non-secure WebSockets. Open the public `https://` URL in the browser.
+Online mode rejects ordinary HTTP requests (except `/up`) and non-secure
+WebSockets. Open the public `https://` URL in the browser.
+
+## Local sharing
+
+On the online NetDrop page, choose **Local Sharing** to download the Windows
+companion. Install it, choose **Host a local room**, then use the updated
+NetDrop room interface to create a room. Participants must be on the same
+Wi-Fi or LAN and can join with the room ID and PIN. If automatic host discovery
+is unavailable, open the host's LAN address directly.
+
+The companion sets local mode for its own server process; users do not need to
+edit `.env` or run Python. The local server stores temporary uploads under the
+user's NetDrop data directory. Local sharing uses HTTP on the LAN, so use a
+trusted private network.
+
+To build the Windows installer locally, install Python 3.12+ and Inno Setup 6,
+then run this from PowerShell:
+
+```powershell
+.\packaging\build-windows.ps1
+```
+
+The generated installer is `dist\installer\NetDrop-Local-Setup.exe`. Publishing
+a GitHub Release builds the installer and attaches that exact asset; the
+website's download link works after the release workflow succeeds. A manually
+dispatched workflow also makes the installer available as a downloadable
+workflow artifact.
 
 ## Configuration
 
@@ -54,7 +80,12 @@ non-secure WebSockets. Open the public `https://` URL in the browser.
 | --- | --- | --- |
 | `NETDROP_HOST` | `0.0.0.0` | Address the server listens on |
 | `NETDROP_PORT` | `8000` | Internal server port |
-| `NETDROP_ONLINE_URL` | required | Public HTTPS origin used in invitations |
+| `NETDROP_SHARING_MODE` | `online` | `online` or `local`; the companion sets `local` |
+| `NETDROP_ONLINE_URL` | required in online mode | Public HTTPS origin used in invitations |
+| `NETDROP_LOCAL_URL` | request origin | Optional HTTP(S) LAN origin used in local invitations |
+| `NETDROP_LOCAL_DISCOVERY` | `1` | Enable local mDNS discovery |
+| `NETDROP_LAN_HOSTNAME` | system hostname | Optional single-label mDNS name |
+| `NETDROP_LOCAL_INSTALLER_URL` | latest Windows release asset | HTTPS download URL shown in Local Sharing |
 | `NETDROP_FILE_TTL_SECONDS` | `1800` | Uploaded-file lifetime |
 | `NETDROP_MAX_UPLOAD_BYTES` | `50000000` | Maximum bytes per uploaded file |
 | `NETDROP_CLEANUP_INTERVAL_SECONDS` | `5` | Expiry-cleanup interval |
@@ -76,6 +107,7 @@ Create a Python Web Service and use:
 
 Set `NETDROP_ONLINE_URL` to the exact HTTPS Render URL. Use one worker and one
 service instance: rooms and sessions are in memory, and uploads are temporary.
+Set `NETDROP_SHARING_MODE=online` for the public service.
 
 ## Security notes
 

@@ -118,7 +118,7 @@ class RoomControlTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn('image/svg+xml', response.headers['content-type'])
             self.assertIn(b'<svg', response.content)
-            self.assertEqual(make.call_args.args[0], 'http://192.168.1.5:8000/#room=' + self.room_id)
+            self.assertEqual(make.call_args.args[0], 'https://netdrop.example/#room=' + self.room_id)
             self.assertNotIn('1234', make.call_args.args[0])
         with TestClient(app, base_url='https://netdrop.example') as stranger:
             self.assertEqual(stranger.get(self.base + '/invitation.svg').status_code, 403)
