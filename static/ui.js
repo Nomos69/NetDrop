@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('cancel', event => { event.preventDefault(); dismissDialog(dialog); }));
   document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('click', event => { if (event.target === dialog && (event.clientX < dialog.getBoundingClientRect().left || event.clientX > dialog.getBoundingClientRect().right || event.clientY < dialog.getBoundingClientRect().top || event.clientY > dialog.getBoundingClientRect().bottom)) dismissDialog(dialog); }));
   document.querySelectorAll('[data-room-action]').forEach(button => button.onclick = () => {
-    showLocalSharingDemo(false);
+    showLocalSharing(false);
     setRoomAction(button.dataset.roomAction);
     document.getElementById('lobby').scrollIntoView({block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
     document.getElementById(button.dataset.roomAction === 'create' ? 'room-name' : 'room-id').focus({preventScroll:true});

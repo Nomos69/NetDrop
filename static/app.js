@@ -29,25 +29,24 @@ for (const action of ['join', 'create']) {
   });
 }
 
-function showLocalSharingDemo(open) {
+function showLocalSharing(open) {
   $('online-lobby').hidden = open;
-  $('local-sharing-demo').hidden = !open;
-  $('lobby').setAttribute('aria-label', open ? 'Local Sharing demonstration' : 'Connect to NetDrop');
+  $('local-sharing').hidden = !open;
+  $('lobby').setAttribute('aria-label', open ? 'Local Sharing' : 'Connect to NetDrop');
   if (open) $('lobby').removeAttribute('aria-labelledby');
   else $('lobby').setAttribute('aria-labelledby', 'entry-title');
   if (open) {
-    history.replaceState(null, '', '#local-sharing-demo');
-    $('local-sharing-demo').querySelector('button')?.focus();
-  } else if (location.hash === '#local-sharing-demo') {
+    history.replaceState(null, '', '#local-sharing');
+    $('local-sharing').querySelector('button')?.focus();
+  } else if (location.hash === '#local-sharing') {
     history.replaceState(null, '', location.pathname + location.search);
     $('local-sharing-link').focus();
   }
 }
 
-$('local-sharing-link').addEventListener('click', () => showLocalSharingDemo(true));
-$('back-to-online').addEventListener('click', () => showLocalSharingDemo(false));
-window.addEventListener('hashchange', () => showLocalSharingDemo(location.hash === '#local-sharing-demo'));
-if (location.hash === '#local-sharing-demo') showLocalSharingDemo(true);
+$('local-sharing-link').addEventListener('click', () => showLocalSharing(true));
+window.addEventListener('hashchange', () => showLocalSharing(location.hash === '#local-sharing'));
+if (location.hash === '#local-sharing') showLocalSharing(true);
 
 function showInvitation(room) {
   $('email-invitation').hidden = !room.is_owner;
