@@ -29,6 +29,23 @@ for (const action of ['join', 'create']) {
   });
 }
 
+function showLocalSharingDemo(open) {
+  $('online-lobby').hidden = open;
+  $('local-sharing-demo').hidden = !open;
+  if (open) {
+    history.replaceState(null, '', '#local-sharing-demo');
+    $('back-to-online').focus();
+  } else if (location.hash === '#local-sharing-demo') {
+    history.replaceState(null, '', location.pathname + location.search);
+    $('local-sharing-link').focus();
+  }
+}
+
+$('local-sharing-link').addEventListener('click', () => showLocalSharingDemo(true));
+$('back-to-online').addEventListener('click', () => showLocalSharingDemo(false));
+window.addEventListener('hashchange', () => showLocalSharingDemo(location.hash === '#local-sharing-demo'));
+if (location.hash === '#local-sharing-demo') showLocalSharingDemo(true);
+
 function showInvitation(room) {
   $('email-invitation').hidden = !room.is_owner;
   $('email-invitation').reset();
