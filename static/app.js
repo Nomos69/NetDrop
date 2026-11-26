@@ -49,20 +49,28 @@ window.addEventListener('hashchange', () => showLocalSharing(location.hash === '
 if (location.hash === '#local-sharing') showLocalSharing(true);
 
 function showInvitation(room) {
-  $('email-invitation').hidden = !room.is_owner;
+  const isLocal = room.mode === 'local';
+  const link = new URL(isLocal && room.local_url ? room.local_url : location.origin);
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(link.hostname);
+  $('email-invitation').hidden = !room.is_owner || (isLocal && loopback);
   $('email-invitation').reset();
   $('email-result').textContent = '';
-  const link = new URL(location.origin);
   // A fragment keeps the room ID out of server access logs. PINs are never included.
   link.hash = `room=${room.id}`;
   $('invite-link').value = link.href;
   $('invite-qr').src = `/api/rooms/${room.id}/invitation.svg`;
   $('qr-invite').open = false;
-  $('room-mode').textContent = 'Online room · Internet required · Share with people on any network.';
-  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(link.hostname);
-  $('invite-help').textContent = loopback
-    ? 'This address works only on this computer. Configure the public HTTPS address before sharing the link with another device. Share the PIN separately.'
-    : 'Share the PIN separately. Opening this link still requires the room PIN.';
+  $('qr-invite').hidden = isLocal && loopback;
+  $('room-mode').textContent = isLocal
+    ? 'Local room · Same Wi-Fi or LAN required · No internet needed.'
+    : 'Online room · Internet required · Share with people on any network.';
+  $('invite-help').textContent = isLocal
+    ? loopback
+      ? 'This address only opens on the host computer. On other devices, open the host PC’s LAN IPv4 address, then enter the room ID. Share the PIN separately.'
+      : 'Join on the same Wi-Fi or LAN. Share the PIN separately.'
+    : loopback
+      ? 'This address works only on this computer. Configure the public HTTPS address before sharing the link with another device. Share the PIN separately.'
+      : 'Share the PIN separately. Opening this link still requires the room PIN.';
 }
 
 $('copy-invite').addEventListener('click', async () => {
@@ -245,6 +253,7 @@ function showRoom(room) {
   if (room) {
     $('active-name').textContent = room.name;
     $('active-id').textContent = room.id;
+    $('mode-badge').textContent = ` / ${room.mode === 'local' ? 'LOCAL NETWORK' : 'ONLINE'}`;
     $('room-mode').dataset.expires = room.expires_at;
     showInvitation(room);
     sessionStorage.setItem('netdrop-room', room.id);
@@ -532,7 +541,9 @@ function updateCountdowns() {
   }
   if (activeRoom?.expires_at) {
     const seconds = Math.max(0, Math.ceil(Number(activeRoom.expires_at) - Date.now() / 1000));
-    $('room-mode').textContent = `Online room · Room expires in ${Math.floor(seconds / 86400)}d ${Math.floor(seconds % 86400 / 3600)}h`;
+    const mode = activeRoom.mode === 'local' ? 'Local room' : 'Online room';
+    const lifetime = `Room expires in ${Math.floor(seconds / 86400)}d ${Math.floor(seconds % 86400 / 3600)}h`;
+    $('room-mode').textContent = `${mode} · ${lifetime}`;
   }
 }
 setInterval(updateCountdowns, 1000);

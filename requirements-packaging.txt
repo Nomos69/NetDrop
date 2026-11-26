@@ -1,0 +1,2 @@
+# Build-only dependency for the Local companion.
+pyinstaller>=6.0,<7

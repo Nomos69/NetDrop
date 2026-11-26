@@ -37,7 +37,7 @@ def enabled():
 
 
 def origin_for(request):
-    return config.ONLINE_URL
+    return config.ONLINE_URL if config.sharing_mode(request) == "online" else config.local_origin(request)
 
 
 def fingerprint(email):
@@ -145,7 +145,8 @@ async def email_invitation(body: Invitation, request: Request, room=Depends(room
                  "expires_at": time.time() + config.INVITATION_TTL_SECONDS}
     link = f"{origin}/#room={room['id']}&invite={token}"
     text = (f'You are invited to NetDrop room: {room["name"]}\nJoin: {link}\n\n'
-            'This invitation expires. It does not grant room access: ask the owner for the PIN separately.')
+            'This invitation expires. It does not grant room access: ask the owner for the PIN separately. '
+            'For a local room, join the same Wi-Fi or LAN as the host.')
     accepted = await send_email({"sender": {"email": config.BREVO_SENDER_EMAIL, "name": config.BREVO_SENDER_NAME},
                                  "to": [{"email": body.email}], "subject": "Your NetDrop room invitation",
                                  "textContent": text, "htmlContent": "<html><body><pre>" + escape(text) + "</pre></body></html>",

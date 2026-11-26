@@ -10,6 +10,8 @@
 .demo-navigation { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 18px; border-top: 1px solid var(--border); }
 .demo-navigation button { font-size: 11px; }
 .local-sharing-demo .demo-caption { margin: 24px 0 16px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.local-sharing-demo .local-download { display: flex; align-items: center; justify-content: center; min-height: 50px; padding: 12px 16px; border: 1px solid transparent; border-radius: 8px; background: var(--button-fill, var(--accent)); color: #fff; font-weight: 600; text-align: center; text-decoration: none; }
+.local-sharing-demo .local-download:hover { background: #1d4ed8; }
 .demo-item { display: flex; gap: 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
 .demo-item > span { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .demo-item button { font-size: 11px; flex-shrink: 0; }
