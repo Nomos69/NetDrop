@@ -73,6 +73,5 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.querySelectorAll('[data-network-device]').forEach(button => button.onclick = () => {
     document.querySelectorAll('[data-network-device]').forEach(el => el.setAttribute('aria-pressed', String(el === button)));
-    document.getElementById('network-caption').textContent = `${button.dataset.networkDevice} · Share through your browser`;
   });
 });
